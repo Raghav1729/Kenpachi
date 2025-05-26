@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI // Import SwiftUI to use Color
 
 /// A centralized structure for all application-wide constants.
 enum Constants {
@@ -16,7 +17,7 @@ enum Constants {
     ///
     /// **IMPORTANT:** Replace "YOUR_TMDB_API_KEY" with your actual TMDB API key.
     /// You can obtain one by signing up at themoviedb.org.
-    static let tmdbAPIKey = "7915349ed68b69af11002f5ea38aa8c6"
+    static let tmdbAPIKey = "YOUR_TMDB_API_KEY"
 
     /// The base URL for the TMDB API.
     static let tmdbBaseURL = "https://api.themoviedb.org/3"
@@ -27,12 +28,6 @@ enum Constants {
 
     /// The GraphQL endpoint for the AniList API.
     static let aniListGraphQLURL = "https://graphql.anilist.co"
-
-    // AniList Client ID and Secret are typically used for OAuth flows,
-    // which might not be strictly necessary for basic data fetching but are included
-    // as placeholders if advanced authenticated queries are needed.
-    // static let aniListClientID = "YOUR_ANILIST_CLIENT_ID"
-    // static let aniListClientSecret = "YOUR_ANILIST_CLIENT_SECRET"
 
     // MARK: - App Configuration
 
@@ -69,5 +64,22 @@ enum Constants {
         static let defaultPadding: CGFloat = 16
         static let smallPadding: CGFloat = 8
         static let largePadding: CGFloat = 24
+    }
+
+    // MARK: - Theme Colors
+
+    /// Defines the primary color palette for the app.
+    /// This can be extended later for full Light/Dark mode support.
+    enum Theme {
+        /// The main background color for most screens (dark grey).
+        static let backgroundColor = Color(red: 0.1, green: 0.1, blue: 0.1, opacity: 1.0) // A very dark grey
+        // For a slightly lighter dark gray, you could use:
+        // static let backgroundColor = Color(red: 0.15, green: 0.15, blue: 0.15, opacity: 1.0)
+
+        /// The primary foreground color for text and icons (white).
+        static let primaryTextColor = Color.white
+
+        /// Accent color for highlights, buttons, and loading indicators (JioHotstar red).
+        static let accentColor = Color(red: 0.8, green: 0.1, blue: 0.15, opacity: 1.0) // A distinct red
     }
 }
