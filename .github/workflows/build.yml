@@ -1,0 +1,48 @@
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build unsigned app
+        run: |
+          xcodebuild \
+            -project Kenpachi.xcodeproj \
+            -scheme Kenpachi \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath ${{ runner.temp }}/derivedData \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            -skipMacroValidation
+
+      - name: Package IPA
+        run: |
+          mkdir -p ${{ runner.temp }}/Payload
+          cp -r ${{ runner.temp }}/derivedData/Build/Products/Release-iphoneos/Kenpachi.app ${{ runner.temp }}/Payload/
+          cd ${{ runner.temp }}
+          zip -r Kenpachi.ipa Payload
+          cd -
+
+      - name: Upload ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kenpachi
+          path: ${{ runner.temp }}/Kenpachi.ipa
