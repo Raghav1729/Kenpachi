@@ -99,6 +99,7 @@ Implement robust security measures including secure API key storage using Keycha
 
 ## Folder Structure
 
+```
 Kenpachi/
 │
 ├── .github/
@@ -480,3 +481,4 @@ Kenpachi/
 ├── .swiftformat
 ├── CHANGELOG.md
 └── README.md
+```
