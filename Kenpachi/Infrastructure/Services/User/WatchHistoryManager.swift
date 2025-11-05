@@ -70,10 +70,14 @@ final class WatchHistoryManager {
   /// Update watch history entry
   func updateWatchHistory(
     content: Content,
+    season: Season?,
     episode: Episode?,
-    progress: Double,
+    currentTime: TimeInterval,
     duration: TimeInterval
   ) async throws {
+    // Calculate progress from currentTime and duration
+    let progress = duration > 0 ? (currentTime / duration) * 100.0 : 0.0
+    
     AppLogger.shared.log(
       "Updating watch history for content \(content.id): \(progress)%",
       level: .debug
@@ -82,12 +86,15 @@ final class WatchHistoryManager {
     let entry = WatchHistoryEntry(
       id: UUID().uuidString,
       contentId: content.id,
+      title: content.title,
+      seasonId: season?.id,
       episodeId: episode?.id,
-      seasonNumber: episode?.seasonNumber,
-      episodeNumber: episode?.episodeNumber,
+      seasonNumber: episode?.seasonNumber ?? (content.type != .movie ? 1 : nil),
+      episodeNumber: episode?.episodeNumber ?? (content.type != .movie ? 1 : nil),
       scraperSource: ScraperManager.shared.getActiveScraper()?.name ?? "FlixHQ",
-      fullPosterURL: content.fullPosterURL,
+      fullPosterURL: episode?.fullStillURL ?? content.fullPosterURL ?? content.fullBackdropURL,
       progress: progress,
+      currentTime: currentTime,
       duration: duration,
       lastWatchedAt: Date()
     )

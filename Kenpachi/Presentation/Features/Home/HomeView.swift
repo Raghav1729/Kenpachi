@@ -60,8 +60,47 @@ struct HomeView: View {
                   }
                 )
                 .padding(.bottom, .spacingXS)
-                
-                // Display "My Watchlist" section immediately after hero carousel
+
+                // Display "Continue Watching" section after hero carousel
+                if !store.watchHistory.isEmpty {
+                  VStack(alignment: .leading, spacing: .spacingM) {
+                    HStack {
+                      Text("home.continue_watching.title")
+                        .font(.headlineSmall)
+                        .foregroundColor(.textPrimary)
+
+                      Spacer()
+
+                      // Display a badge with the name of the active scraper.
+                      Text(ScraperManager.shared.getActiveScraper()?.name ?? "")
+                        .font(.captionLarge)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, .spacingS)
+                        .padding(.vertical, .spacingXS)
+                        .background(Color.primaryBlue.opacity(0.7))
+                        .cornerRadius(.radiusS)
+                    }
+                    .padding(.horizontal, .spacingM)
+                    .padding(.bottom, .spacingS)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                      LazyHStack(spacing: .spacingS + 4) {
+                        ForEach(store.watchHistory.prefix(10)) { entry in
+                          ContentProgressCard(
+                            entry: entry,
+                            onTapped: { store.send(.historyItemTapped(entry)) },
+                            width: 160
+                          )
+                        }
+                      }
+                      .padding(.horizontal, .spacingM)
+                    }
+                  }
+                  .padding(.top, .spacingXS)
+                }
+
+                // Display "My Watchlist" section after "Continue Watching"
                 if !store.watchlistItems.isEmpty {
                   VStack(alignment: .leading, spacing: .spacingM) {
                     HStack {
@@ -70,7 +109,7 @@ struct HomeView: View {
                         .foregroundColor(.textPrimary)
 
                       Spacer()
-                      
+
                       // Display a badge with the name of the active scraper.
                       Text(ScraperManager.shared.getActiveScraper()?.name ?? "")
                         .font(.captionLarge)
@@ -96,35 +135,6 @@ struct HomeView: View {
                   .padding(.top, .spacingXS)
                 }
 
-                // Display "Continue Watching" section after "My Watchlist"
-                if !store.watchHistory.isEmpty {
-                  VStack(alignment: .leading, spacing: .spacingM) {
-                    HStack {
-                      Text("home.continue_watching.title")
-                        .font(.headlineSmall)
-                        .foregroundColor(.textPrimary)
-
-                      Spacer()
-                    }
-                    .padding(.horizontal, .spacingM)
-                    .padding(.bottom, .spacingS)
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                      LazyHStack(spacing: .spacingS + 4) {
-                        ForEach(store.watchHistory.prefix(10)) { entry in
-                          ContentProgressCard(
-                            entry: entry,
-                            onTapped: { store.send(.historyItemTapped(entry)) },
-                            width: 280
-                          )
-                        }
-                      }
-                      .padding(.horizontal, .spacingM)
-                    }
-                  }
-                  .padding(.top, .spacingXS)
-                }
-                
                 // Otherwise, create a `ContentRowSection`.
               } else {
                 ContentRowSection(
@@ -180,7 +190,8 @@ struct HomeView: View {
           store: Store(
             initialState: PlayerFeature.State(
               content: content,
-              episode: nil,
+              season: content.seasons?.first,
+              episode: content.seasons?.first?.episodes?.first,
               streamingLinks: store.streamingLinks
             )
           ) {

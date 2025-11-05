@@ -13,6 +13,8 @@ struct PlayerFeature {
   struct State: Equatable {
     /// Content being played
     let content: Content
+    /// Selected season (for TV shows)
+    let season: Season?
     /// Selected episode (for TV shows)
     let episode: Episode?
     /// Available streaming links
@@ -72,8 +74,9 @@ struct PlayerFeature {
     /// Show subtitle menu
     var showSubtitleMenu = false
 
-    init(content: Content, episode: Episode?, streamingLinks: [ExtractedLink]) {
+    init(content: Content, season: Season?, episode: Episode?, streamingLinks: [ExtractedLink]) {
       self.content = content
+      self.season = season
       self.episode = episode
       self.streamingLinks = streamingLinks
       self.selectedLink = streamingLinks.first
@@ -155,16 +158,19 @@ struct PlayerFeature {
 
       case .onDisappear:
         // Save watch history when leaving the player
-        let progress = state.duration > 0 ? (state.currentTime / state.duration) * 100.0 : 0.0
         let content = state.content
         let episode = state.episode
+        let season = state.season
+        let currentTime = state.currentTime
         let duration = state.duration
+        
         return .run { _ in
           do {
             try await WatchHistoryManager.shared.updateWatchHistory(
               content: content,
+              season: season,
               episode: episode,
-              progress: progress,
+              currentTime: currentTime,
               duration: duration
             )
           } catch {
@@ -275,16 +281,19 @@ struct PlayerFeature {
         state.isPlaying = isPlaying
         // When playback pauses/stops, persist watch history
         if !isPlaying {
-          let progress = state.duration > 0 ? (state.currentTime / state.duration) * 100.0 : 0.0
           let content = state.content
           let episode = state.episode
+          let season = state.season
+          let currentTime = state.currentTime
           let duration = state.duration
+          
           return .run { _ in
             do {
               try await WatchHistoryManager.shared.updateWatchHistory(
                 content: content,
+                season: season,
                 episode: episode,
-                progress: progress,
+                currentTime: currentTime,
                 duration: duration
               )
             } catch {

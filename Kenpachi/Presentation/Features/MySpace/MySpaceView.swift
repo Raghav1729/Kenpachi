@@ -36,6 +36,43 @@ struct MySpaceView: View {
               )
               .padding(.horizontal, .spacingM)
 
+              /// Support Development Button
+              SupportDevelopmentButton(onSupportTapped: { store.send(.supportTapped) })
+                .padding(.horizontal, .spacingM)
+              
+              /// Watch history section (Hotstar style)
+              if !store.watchHistory.isEmpty {
+                VStack(alignment: .leading, spacing: .spacingS + 4) {
+                  HStack {
+                    Text("myspace.history.title")
+                      .font(.headlineSmall)
+                      .foregroundColor(.textPrimary)
+
+                    Spacer()
+
+                    Button("myspace.history.clear") {
+                      store.send(.clearWatchHistory)
+                    }
+                    .font(.labelMedium)
+                    .foregroundColor(.primaryBlue)
+                  }
+                  .padding(.horizontal, .spacingM)
+
+                  ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: .spacingS + 4) {
+                      ForEach(store.watchHistory.prefix(10)) { entry in
+                        ContentProgressCard(
+                          entry: entry,
+                          onTapped: { store.send(.historyItemTapped(entry)) },
+                          width: 160
+                        )
+                      }
+                    }
+                    .padding(.horizontal, .spacingM)
+                  }
+                }
+              }
+
               /// Watchlist section (Hotstar style)
               if !store.watchlist.isEmpty {
                 VStack(alignment: .leading, spacing: .spacingS + 4) {
@@ -72,39 +109,6 @@ struct MySpaceView: View {
                 }
               }
 
-              /// Watch history section (Hotstar style)
-              if !store.watchHistory.isEmpty {
-                VStack(alignment: .leading, spacing: .spacingS + 4) {
-                  HStack {
-                    Text("myspace.history.title")
-                      .font(.headlineSmall)
-                      .foregroundColor(.textPrimary)
-
-                    Spacer()
-
-                    Button("myspace.history.clear") {
-                      store.send(.clearWatchHistory)
-                    }
-                    .font(.labelMedium)
-                    .foregroundColor(.primaryBlue)
-                  }
-                  .padding(.horizontal, .spacingM)
-
-                  ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: .spacingS + 4) {
-                      ForEach(store.watchHistory.prefix(10)) { entry in
-                        ContentProgressCard(
-                          entry: entry,
-                          onTapped: { store.send(.historyItemTapped(entry)) },
-                          width: 280
-                        )
-                      }
-                    }
-                    .padding(.horizontal, .spacingM)
-                  }
-                }
-              }
-
               /// Empty state
               if store.watchlist.isEmpty && store.watchHistory.isEmpty {
                 EmptyMySpaceView()
@@ -120,6 +124,7 @@ struct MySpaceView: View {
       .onAppear {
         store.send(.onAppear)
       }
+      .alert($store.scope(state: \.alert, action: \.alert))
       .sheet(
         item: $store.scope(state: \.settings, action: \.settings)
       ) { settingsStore in
@@ -258,9 +263,33 @@ struct CompactStatCard: View {
   }
 }
 
+// MARK: - Support Development Button
+struct SupportDevelopmentButton: View {
+  let onSupportTapped: () -> Void
 
-
-
+  var body: some View {
+    Button(action: onSupportTapped) {
+      HStack {
+        Image(systemName: "heart.fill")
+          .foregroundColor(.white)
+        Text("settings.support")
+          .fontWeight(.semibold)
+          .foregroundColor(.white)
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, .spacingM + 4)
+      .background(
+        LinearGradient(
+          colors: [Color.primaryBlue, Color.primaryBlue.opacity(0.8)],
+          startPoint: .leading,
+          endPoint: .trailing
+        )
+      )
+      .cornerRadius(.radiusM)
+    }
+    .padding(.top, .spacingL)
+  }
+}
 
 // MARK: - Empty MySpace View
 struct EmptyMySpaceView: View {

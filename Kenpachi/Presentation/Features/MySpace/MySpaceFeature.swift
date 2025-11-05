@@ -4,6 +4,8 @@
 
 import ComposableArchitecture
 import Foundation
+import UIKit
+import SwiftUI
 
 @Reducer
 struct MySpaceFeature {
@@ -22,6 +24,8 @@ struct MySpaceFeature {
     var errorMessage: String?
     /// Show settings
     @Presents var settings: SettingsFeature.State?
+    /// Alert state
+    @Presents var alert: AlertState<Action.Alert>?
     /// Statistics
     var totalWatchTime: TimeInterval = 0
     var contentWatched: Int = 0
@@ -47,6 +51,10 @@ struct MySpaceFeature {
     case historyItemTapped(WatchHistoryEntry)
     /// Settings tapped
     case settingsTapped
+    /// Support tapped
+    case supportTapped
+    /// Alert actions
+    case alert(PresentationAction<Alert>)
     /// Settings actions
     case settings(PresentationAction<SettingsFeature.Action>)
     /// Remove from watchlist
@@ -57,6 +65,11 @@ struct MySpaceFeature {
     case errorOccurred(String)
     /// Delegate actions
     case delegate(Delegate)
+
+    /// Alert action enum
+    enum Alert: Equatable {
+      case confirmSupport
+    }
 
     enum Delegate: Equatable {
       case settingsUpdated
@@ -146,6 +159,32 @@ struct MySpaceFeature {
         state.settings = SettingsFeature.State()
         return .none
 
+      case .supportTapped:
+        /// Show support confirmation alert
+        state.alert = AlertState {
+          TextState("settings.support_alert_title")
+        } actions: {
+          ButtonState(role: .none, action: .confirmSupport) {
+            TextState("settings.support_confirm")
+          }
+          ButtonState(role: .cancel) {
+            TextState("settings.support_cancel")
+          }
+        } message: {
+          TextState("settings.support_alert_message")
+        }
+        return .none
+
+      case .alert(.presented(.confirmSupport)):
+        return .run { _ in
+          // Open GitHub sponsors page in Safari
+          await MainActor.run {
+            if let url = URL(string: "https://github.com/sponsors/Raghav1729") {
+              UIApplication.shared.open(url)
+            }
+          }
+        }
+
       case .settings(.presented(.delegate(.settingsUpdated))):
         /// Settings were updated, refresh watchlist as scraper may have changed
         return .merge(
@@ -187,6 +226,10 @@ struct MySpaceFeature {
         state.isLoading = false
         return .none
 
+      case .alert:
+        /// Handle alert actions
+        return .none
+
       case .delegate:
         /// Delegate actions handled by parent
         return .none
@@ -195,5 +238,6 @@ struct MySpaceFeature {
     .ifLet(\.$settings, action: \.settings) {
       SettingsFeature()
     }
+    .ifLet(\.$alert, action: \.alert)
   }
 }

@@ -10,6 +10,8 @@ struct Download: Equatable, Identifiable, Codable {
   let id: String
   /// Content being downloaded
   let content: Content
+  /// Season being downloaded (for TV shows)
+  let season: Season?
   /// Episode being downloaded (for TV shows)
   let episode: Episode?
   /// Current download state
@@ -37,6 +39,7 @@ struct Download: Equatable, Identifiable, Codable {
   init(
     id: String = UUID().uuidString,
     content: Content,
+    season: Season? = nil,
     episode: Episode? = nil,
     state: DownloadState = .pending,
     progress: Double = 0.0,
@@ -51,6 +54,7 @@ struct Download: Equatable, Identifiable, Codable {
   ) {
     self.id = id
     self.content = content
+    self.season = season
     self.episode = episode
     self.state = state
     self.progress = progress

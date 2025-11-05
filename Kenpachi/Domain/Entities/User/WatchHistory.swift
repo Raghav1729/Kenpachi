@@ -10,6 +10,10 @@ struct WatchHistoryEntry: Equatable, Identifiable, Codable {
   let id: String
   /// Content ID
   let contentId: String
+  /// Title of the content
+  let title: String
+  /// Season ID (for TV shows)
+  let seasonId: String?
   /// Episode ID (for TV shows)
   let episodeId: String?
   /// Season Number (for TV shows)
@@ -35,6 +39,8 @@ struct WatchHistoryEntry: Equatable, Identifiable, Codable {
   init(
     id: String = UUID().uuidString,
     contentId: String,
+    title: String,
+    seasonId: String? = nil,
     episodeId: String? = nil,
     seasonNumber: Int? = nil,
     episodeNumber: Int? = nil,
@@ -48,6 +54,8 @@ struct WatchHistoryEntry: Equatable, Identifiable, Codable {
   ) {
     self.id = id
     self.contentId = contentId
+    self.title = title
+    self.seasonId = seasonId
     self.episodeId = episodeId
     self.seasonNumber = seasonNumber
     self.episodeNumber = episodeNumber
@@ -67,12 +75,12 @@ struct WatchHistoryEntry: Equatable, Identifiable, Codable {
 
   /// Whether content is in progress (watched > 5% and < 90%)
   var isInProgress: Bool {
-    progress > 0.05 && progress < 0.9
+    progress > 1 && progress < 98.0
   }
 
   /// Formatted progress percentage
   var formattedProgress: String {
-    "\(Int(progress * 100))%"
+    "\(Int(progress))%"
   }
 }
 

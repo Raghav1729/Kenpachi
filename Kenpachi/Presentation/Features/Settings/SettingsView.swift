@@ -2,6 +2,7 @@
 // Settings screen UI
 // Comprehensive settings similar to Disney Plus Hotstar
 
+// Added comment to trigger recompilation
 import ComposableArchitecture
 import SwiftUI
 
@@ -390,21 +391,22 @@ struct SettingsView: View {
               }
             }
 
-            /// Logout button (Hotstar style)
+            /// Support button (Hotstar style)
+            /// Opens GitHub sponsors page when tapped
             Button {
-              store.send(.logoutTapped)
+              store.send(.supportTapped)
             } label: {
               HStack(spacing: .spacingS) {
-                Image(systemName: "rectangle.portrait.and.arrow.right")
+                Image(systemName: "heart.fill")
                   .font(.labelLarge)
-                Text("settings.logout")
+                Text("settings.support")
                   .font(.labelLarge)
                   .fontWeight(.medium)
               }
               .foregroundColor(.white)
               .frame(maxWidth: .infinity)
               .padding(.vertical, .spacingM)
-              .background(Color.error)
+              .background(Color.primaryBlue)
               .cornerRadius(.radiusM)
             }
             .padding(.horizontal, .spacingM)

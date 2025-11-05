@@ -120,6 +120,7 @@ struct DownloadsView: View {
               store: Store(
                 initialState: PlayerFeature.State(
                   content: download.content,
+                  season: download.season,
                   episode: download.episode,
                   streamingLinks: [localLink]
                 )

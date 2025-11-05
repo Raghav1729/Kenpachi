@@ -156,7 +156,7 @@ struct SettingsFeature {
     case helpTapped
     case privacyPolicyTapped
     case termsOfServiceTapped
-    case logoutTapped
+    case supportTapped
 
     /// Alert actions
     case alert(PresentationAction<Alert>)
@@ -170,12 +170,13 @@ struct SettingsFeature {
       case confirmClearImageCache
       case confirmClearSearchHistory
       case confirmLogout
+      case confirmClearUserDefaults
+      case confirmSupport
     }
 
     /// Delegate action enum
     enum Delegate: Equatable {
       case settingsUpdated
-      case logout
     }
   }
 
@@ -541,23 +542,30 @@ struct SettingsFeature {
         /// TODO: Implement navigation to respective screens
         return .none
 
-      case .logoutTapped:
+      case .supportTapped:
         state.alert = AlertState {
-          TextState("settings.logout_alert_title")
+          TextState("settings.support_alert_title")
         } actions: {
-          ButtonState(role: .destructive, action: .confirmLogout) {
-            TextState("settings.logout_confirm")
+          ButtonState(role: .none, action: .confirmSupport) {
+            TextState("settings.support_confirm")
           }
           ButtonState(role: .cancel) {
-            TextState("settings.logout_cancel")
+            TextState("settings.support_cancel")
           }
         } message: {
-          TextState("settings.logout_alert_message")
+          TextState("settings.support_alert_message")
         }
         return .none
 
-      case .alert(.presented(.confirmLogout)):
-        return .send(.delegate(.logout))
+      case .alert(.presented(.confirmSupport)):
+        return .run { _ in
+          // Open GitHub sponsors page in Safari
+          await MainActor.run {
+            if let url = URL(string: "https://github.com/sponsors/Raghav1729") {
+              UIApplication.shared.open(url)
+            }
+          }
+        }
 
       case .alert:
         return .none

@@ -320,9 +320,13 @@ struct FlixHQ: ScraperProtocol {
     let seasonsEndpoint = FlixHQEndpoint(
       baseURL: baseURL, path: "/ajax/v2/tv/seasons/\(tvNumericId)")
     let seasonsHtmlData = try await networkClient.requestData(seasonsEndpoint)
-    let seasonsDoc = try await MainActor.run { try HTMLParser.parse(String(data: seasonsHtmlData, encoding: .utf8) ?? "") }
+    let seasonsDoc = try await MainActor.run {
+      try HTMLParser.parse(String(data: seasonsHtmlData, encoding: .utf8) ?? "")
+    }
     // In the response, season links are `<a>` tags inside the dropdown menu.
-    let seasonElements = await MainActor.run { HTMLParser.extractElements(from: seasonsDoc, selector: ".dropdown-menu a") }
+    let seasonElements = await MainActor.run {
+      HTMLParser.extractElements(from: seasonsDoc, selector: ".dropdown-menu a")
+    }
 
     // 2. Fetch Episodes for each season concurrently using a TaskGroup for performance.
     return try await withThrowingTaskGroup(of: Season.self) { group in
@@ -330,7 +334,8 @@ struct FlixHQ: ScraperProtocol {
 
       // A simple counter is reliable for determining the season number, as seen in the TS example.
       for (index, seasonElement) in seasonElements.enumerated() {
-        guard let seasonId = try? await MainActor.run(body: { try seasonElement.attr("data-id") }) else { continue }
+        guard let seasonId = try? await MainActor.run(body: { try seasonElement.attr("data-id") })
+        else { continue }
         let seasonNumber = index + 1
 
         // Add a new asynchronous task to the group for each season.
@@ -339,11 +344,15 @@ struct FlixHQ: ScraperProtocol {
           let episodesEndpoint = FlixHQEndpoint(
             baseURL: self.baseURL, path: "/ajax/v2/season/episodes/\(seasonId)")
           let episodesHtmlData = try await self.networkClient.requestData(episodesEndpoint)
-          let episodesDoc = try await MainActor.run { try HTMLParser.parse(
-            String(data: episodesHtmlData, encoding: .utf8) ?? "") }
+          let episodesDoc = try await MainActor.run {
+            try HTMLParser.parse(
+              String(data: episodesHtmlData, encoding: .utf8) ?? "")
+          }
 
           // In the new response, episode items are `<li>` tags inside a `.nav`.
-          let episodeElements = await MainActor.run { HTMLParser.extractElements(from: episodesDoc, selector: ".nav > li") }
+          let episodeElements = await MainActor.run {
+            HTMLParser.extractElements(from: episodesDoc, selector: ".nav > li")
+          }
 
           let episodes = try await MainActor.run {
             episodeElements.compactMap { el -> Episode? in
@@ -367,7 +376,8 @@ struct FlixHQ: ScraperProtocol {
               guard let episodeNumber = Int(epNumberStr) else { return nil }
 
               return Episode(
-                id: episodeId, episodeNumber: episodeNumber, seasonNumber: seasonNumber, name: epName)
+                id: episodeId, episodeNumber: episodeNumber, seasonNumber: seasonNumber,
+                name: epName)
             }
           }
           let seasonName = "Season \(seasonNumber)"
@@ -399,8 +409,14 @@ struct FlixHQ: ScraperProtocol {
     // 1. Determine the correct endpoint for fetching servers
     let serversPath: String
     let isMovie = contentId.starts(with: "movie/")
+    var mutableEpisodeId = episodeId
 
-    if let epId = episodeId, !isMovie {
+    if !isMovie && mutableEpisodeId == nil {
+      var content = try await fetchContentDetails(id: contentId, type: ContentType.tvShow)
+      mutableEpisodeId = content.seasons?.first?.episodes?.first?.id
+    }
+
+    if let epId = mutableEpisodeId, !isMovie {
       // For TV shows, use the v2 endpoint for fetching episode servers
       serversPath = "/ajax/v2/episode/servers/\(epId)"
     } else {

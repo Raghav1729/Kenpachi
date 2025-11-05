@@ -176,7 +176,7 @@ final class UserRepository: UserRepositoryProtocol {
     {
       // Filter entries to only include those from the current scraper
       let filteredEntries = history.entries.filter { entry in
-        entry.scraperSource == currentScraper
+        entry.scraperSource == currentScraper && entry.isInProgress
       }
       
       // Return history with filtered entries
@@ -195,7 +195,21 @@ final class UserRepository: UserRepositoryProtocol {
   /// Update watch history entry
   func updateWatchHistoryEntry(_ entry: WatchHistoryEntry) async throws {
     var history = try await fetchWatchHistory()
-    history.updateEntry(entry)
+    
+    // Check if an entry with matching contentId, seasonId, and episodeId already exists
+    if let existingIndex = history.entries.firstIndex(where: { existingEntry in
+      existingEntry.contentId == entry.contentId &&
+      existingEntry.seasonId == entry.seasonId &&
+      existingEntry.episodeId == entry.episodeId
+    }) {
+      // Update the existing entry
+      history.entries[existingIndex] = entry
+    } else {
+      // Insert new entry
+      history.entries.append(entry)
+    }
+    
+    history.updatedAt = Date()
     let data = try encoder.encode(history)
     userDefaults.set(data, forKey: watchHistoryKey)
   }

@@ -86,10 +86,27 @@ struct HomeFeature {
     Reduce { state, action in
       switch action {
       case .onAppear:
-        // If the content carousels are already populated, do nothing.
-        guard state.contentCarousels.isEmpty else { return .none }
-        // Otherwise, initiate the loading of content.
-        return .send(.loadContent)
+        // Always refresh watch history when view appears
+        let refreshWatchHistory: Effect<Action> = .run { send in
+          do {
+            // Fetch watch history entries
+            let watchHistory = try await UserRepository.shared.fetchWatchHistory()
+            let recentEntries = watchHistory.recentEntries(limit: 20)
+            await send(.watchHistoryLoaded(recentEntries))
+          } catch {
+            AppLogger.shared.log("Failed to load watch history: \(error)", level: .warning)
+          }
+        }
+        
+        // If the content carousels are empty, also load content.
+        if state.contentCarousels.isEmpty {
+          return .merge(
+            .send(.loadContent),
+            refreshWatchHistory
+          )
+        }
+        // Otherwise, just refresh watch history.
+        return refreshWatchHistory
 
       case .loadContent:
         // Set the loading state to true.
@@ -132,8 +149,8 @@ struct HomeFeature {
 
             // Fetch watch history entries
             let watchHistory = try await UserRepository.shared.fetchWatchHistory()
-            let inProgressEntries = watchHistory.inProgressEntries
-            await send(.watchHistoryLoaded(inProgressEntries))
+            let recentEntries = watchHistory.recentEntries(limit: 20)
+            await send(.watchHistoryLoaded(recentEntries))
 
             // Get the items from the hero carousel.
             let heroItems = carousels.first(where: { $0.type == .hero })?.items ?? []

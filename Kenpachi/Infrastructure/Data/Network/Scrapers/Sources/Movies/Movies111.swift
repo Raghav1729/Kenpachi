@@ -26,12 +26,8 @@ struct Movies111: ScraperProtocol {
   /// TMDB client for content metadata
   private let tmdbClient: TMDBClient
 
-  // AES encryption constants
-  private let aesKeyHex = "912660f3d9f3f35cee36396d31ed73366ab53c22c70710ce029697d17762997e"
-  private let aesIVHex = "f91f2863783814f51c56f341d6ce1677"
-  private let xorKeyHex = "be430a"
-  private let staticPath =
-    "to/1000003134441812/c945be05/2f30b6e198562e7015537bb71a738ff8245942a7/y/2c20617150078ad280239d1cc3a8b6ee9331acef9b0bdc6b742435597c38edb4/c8ddbffe-3efb-53e1-b883-3b6ce90ba310"
+  // Configuration URL
+  private let configURL = "https://raw.githubusercontent.com/phisher98/TVVVV/main/output.json"
 
   // MARK: - Initialization
 
@@ -107,10 +103,8 @@ struct Movies111: ScraperProtocol {
   func extractStreamingLinks(
     contentId: String, seasonId: String? = nil, episodeId: String? = nil
   ) async throws -> [ExtractedLink] {
-    let isTVShow = seasonId != nil && episodeId != nil
     let embedURL: String
-
-    if isTVShow, let season = seasonId, let episode = episodeId {
+    if let season = seasonId, let episode = episodeId {
       embedURL = "/tv/\(contentId)/\(season)/\(episode)"
     } else {
       embedURL = "/movie/\(contentId)"
@@ -118,72 +112,94 @@ struct Movies111: ScraperProtocol {
 
     print("\n🎬 [111Movies] ========== EXTRACT STREAMING LINKS START ==========")
     print("📥 [111Movies] Input - contentId: \(contentId)")
-    print("🔗 [111Movies] Step 1: Fetching embed page: \(baseURL)\(embedURL)")
+    
+    // Step 1: Fetch configuration
+    print("� [111MMovies] Step 1: Fetching configuration from remote")
+    let configEndpoint = SimpleEndpoint(url: configURL)
+    let configData = try await networkClient.requestData(configEndpoint)
+    let config = try JSONDecoder().decode(Movies111Config.self, from: configData)
+    print("✅ [111Movies] Step 1: Configuration loaded")
 
+    // Step 2: Fetch embed page
+    print("🔗 [111Movies] Step 2: Fetching embed page: \(baseURL)\(embedURL)")
     let endpoint = Movies111Endpoint(baseURL: baseURL, path: embedURL)
     let data = try await networkClient.requestData(endpoint)
 
     guard let html = String(data: data, encoding: .utf8) else {
       throw ScraperError.parsingFailed("Failed to decode HTML")
     }
+    print("✅ [111Movies] Step 2: Received HTML (\(html.count) characters)")
 
-    print("✅ [111Movies] Step 1: Received HTML (\(html.count) characters)")
-
+    // Step 3: Extract raw data
     guard let rawData = extractRawData(from: html) else {
       throw ScraperError.parsingFailed("Failed to extract raw data")
     }
+    print("✅ [111Movies] Step 3: Extracted raw data (\(rawData.count) characters)")
 
-    print("✅ [111Movies] Step 2: Extracted raw data (\(rawData.count) characters)")
+    // Step 4: Process encryption
+    let encodedData = try processEncryptionPipeline(rawData: rawData, config: config)
+    print("✅ [111Movies] Step 4: Encryption complete (\(encodedData.count) characters)")
 
-    let encodedData = try processEncryptionPipeline(rawData: rawData)
+    // Step 5: Fetch servers
+    let serversPath = "/\(config.staticPath)/\(encodedData)/sr"
+    print("🌐 [111Movies] Step 5: Fetching servers: \(baseURL)\(serversPath)")
 
-    print("✅ [111Movies] Step 3: Encryption complete (\(encodedData.count) characters)")
-
-    let serversPath = "/\(staticPath)/\(encodedData)/sr"
-    print("🌐 [111Movies] Step 4: Fetching servers: \(baseURL)\(serversPath)")
-
-    let serversEndpoint = Movies111Endpoint(baseURL: baseURL, path: serversPath, method: .post)
+    let serversEndpoint = Movies111Endpoint(
+      baseURL: baseURL,
+      path: serversPath,
+      method: config.httpMethod == "GET" ? .get : .post,
+      config: config
+    )
     let serversData = try await networkClient.requestData(serversEndpoint)
+    let servers = try JSONDecoder().decode([ServerEntry].self, from: serversData)
+    print("✅ [111Movies] Step 5: Got \(servers.count) servers")
 
-    struct ServerResponse: Decodable {
-      let data: String
-    }
+    // Step 6: Extract streams from all servers
+    var extractedLinks: [ExtractedLink] = []
+    
+    for server in servers {
+      let streamPath = "/\(config.staticPath)/\(server.data)"
+      print("🎥 [111Movies] Step 6: Fetching stream from \(server.name): \(baseURL)\(streamPath)")
 
-    let servers = try JSONDecoder().decode([ServerResponse].self, from: serversData)
-    print("✅ [111Movies] Step 4: Got \(servers.count) servers")
-
-    guard let randomServer = servers.randomElement() else {
-      throw ScraperError.parsingFailed("No servers available")
-    }
-
-    let streamPath = "/\(staticPath)/\(randomServer.data)"
-    print("🎥 [111Movies] Step 5: Fetching stream: \(baseURL)\(streamPath)")
-
-    let streamEndpoint = Movies111Endpoint(baseURL: baseURL, path: streamPath, method: .post)
-    let streamData = try await networkClient.requestData(streamEndpoint)
-
-    struct StreamResponse: Decodable {
-      let url: String
-    }
-
-    let streamResponse = try JSONDecoder().decode(StreamResponse.self, from: streamData)
-
-    print("✅ [111Movies] Got streaming URL: \(streamResponse.url)")
-    print("✅ [111Movies] ========== EXTRACT STREAMING LINKS SUCCESS ==========\n")
-
-    return [
-      ExtractedLink(
-        url: streamResponse.url,
-        quality: "Auto",
-        server: "111Movies",
-        requiresReferer: true,
-        headers: [
-          "Referer": baseURL + "/",
-          "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36",
-        ],
-        type: .m3u8
+      let streamEndpoint = Movies111Endpoint(
+        baseURL: baseURL,
+        path: streamPath,
+        method: config.httpMethod == "GET" ? .get : .post,
+        config: config
       )
-    ]
+      
+      do {
+        let streamData = try await networkClient.requestData(streamEndpoint)
+        let streamResponse = try JSONDecoder().decode(StreamResponse.self, from: streamData)
+        
+        if let url = streamResponse.url {
+          extractedLinks.append(
+            ExtractedLink(
+              url: url,
+              quality: "Auto",
+              server: "111Movies - \(server.name)",
+              requiresReferer: true,
+              headers: [
+                "Referer": baseURL + "/",
+                "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36",
+              ],
+              type: .m3u8
+            )
+          )
+          print("✅ [111Movies] Got streaming URL from \(server.name)")
+        }
+      } catch {
+        print("⚠️ [111Movies] Failed to fetch stream from \(server.name): \(error)")
+        continue
+      }
+    }
+
+    guard !extractedLinks.isEmpty else {
+      throw ScraperError.parsingFailed("No streaming links available")
+    }
+
+    print("✅ [111Movies] ========== EXTRACT STREAMING LINKS SUCCESS (\(extractedLinks.count) links) ==========\n")
+    return extractedLinks
   }
 
   // MARK: - Helper Methods
@@ -200,9 +216,9 @@ struct Movies111: ScraperProtocol {
     return String(html[range])
   }
 
-  private func processEncryptionPipeline(rawData: String) throws -> String {
-    guard let aesKey = Data(hexString: aesKeyHex),
-      let aesIV = Data(hexString: aesIVHex)
+  private func processEncryptionPipeline(rawData: String, config: Movies111Config) throws -> String {
+    guard let aesKey = Data(hexString: config.keyHex),
+      let aesIV = Data(hexString: config.ivHex)
     else {
       throw ScraperError.parsingFailed("Failed to prepare AES keys")
     }
@@ -210,12 +226,12 @@ struct Movies111: ScraperProtocol {
     let aesEncrypted = try performAESCBCEncryption(data: rawData, key: aesKey, iv: aesIV)
     let hexString = aesEncrypted.map { String(format: "%02x", $0) }.joined()
 
-    guard let xorKey = Data(hexString: xorKeyHex) else {
+    guard let xorKey = Data(hexString: config.xorKey) else {
       throw ScraperError.parsingFailed("Failed to prepare XOR key")
     }
 
     let xorResult = performXOROnHex(hexString: hexString, key: xorKey)
-    let encoded = customBase64Encode(string: xorResult)
+    let encoded = customBase64Encode(string: xorResult, src: config.src, dst: config.dst)
 
     return encoded
   }
@@ -276,10 +292,7 @@ struct Movies111: ScraperProtocol {
     return result
   }
 
-  private func customBase64Encode(string: String) -> String {
-  let sourceChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
-  let targetChars = "oE5J6vu_AikszPbNK1TWjV-X29Ue0HFZDILRwdclBxp3M8tOamGgCQSh7rnfqy4Y"
-
+  private func customBase64Encode(string: String, src: String, dst: String) -> String {
     guard let data = string.data(using: .utf8) else { return "" }
 
     var base64 = data.base64EncodedString()
@@ -289,10 +302,9 @@ struct Movies111: ScraperProtocol {
 
     var result = ""
     for char in base64 {
-      if let index = sourceChars.firstIndex(of: char) {
-        let targetIndex = sourceChars.distance(from: sourceChars.startIndex, to: index)
-        let targetChar = targetChars[
-          targetChars.index(targetChars.startIndex, offsetBy: targetIndex)]
+      if let index = src.firstIndex(of: char) {
+        let targetIndex = src.distance(from: src.startIndex, to: index)
+        let targetChar = dst[dst.index(dst.startIndex, offsetBy: targetIndex)]
         result.append(targetChar)
       } else {
         result.append(char)
@@ -303,27 +315,89 @@ struct Movies111: ScraperProtocol {
   }
 }
 
-// MARK: - Endpoint
+// MARK: - Data Structures
+
+private struct Movies111Config: Decodable {
+  let src: String
+  let dst: String
+  let staticPath: String
+  let httpMethod: String
+  let keyHex: String
+  let ivHex: String
+  let xorKey: String
+  let csrfToken: String
+  let contentTypes: String
+
+  enum CodingKeys: String, CodingKey {
+    case src
+    case dst
+    case staticPath = "static_path"
+    case httpMethod = "http_method"
+    case keyHex = "key_hex"
+    case ivHex = "iv_hex"
+    case xorKey = "xor_key"
+    case csrfToken = "csrf_token"
+    case contentTypes = "content_types"
+  }
+}
+
+private struct ServerEntry: Decodable {
+  let name: String
+  let description: String
+  let image: String
+  let data: String
+}
+
+private struct StreamResponse: Decodable {
+  let url: String?
+  let tracks: [SubtitleTrack]?
+}
+
+private struct SubtitleTrack: Decodable {
+  let label: String?
+  let file: String?
+}
+
+// MARK: - Endpoints
+
+private struct SimpleEndpoint: Endpoint {
+  let url: String
+  
+  var baseURL: String { url }
+  var path: String { "" }
+  var method: HTTPMethod { .get }
+  var queryItems: [URLQueryItem]? { nil }
+  var headers: [String: String]? { nil }
+  var body: Data? { nil }
+}
 
 private struct Movies111Endpoint: Endpoint {
   let baseURL: String
   let path: String
   let method: HTTPMethod
+  let config: Movies111Config?
 
-  init(baseURL: String, path: String, method: HTTPMethod = .get) {
+  init(baseURL: String, path: String, method: HTTPMethod = .get, config: Movies111Config? = nil) {
     self.baseURL = baseURL
     self.path = path
     self.method = method
+    self.config = config
   }
 
   var queryItems: [URLQueryItem]? { nil }
   var headers: [String: String]? {
-    [
+    var headers = [
       "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
       "Referer": baseURL + "/",
-      "X-Requested-With": "XMLHttpRequest",
-      "X-Csrf-Token": "2hMBbDj1GbuON0tOGuitsOFTlVcLwoV8"
+      "X-Requested-With": "XMLHttpRequest"
     ]
+    
+    if let config = config {
+      headers["Content-Type"] = config.contentTypes
+      headers["X-Csrf-Token"] = config.csrfToken
+    }
+    
+    return headers
   }
   var body: Data? { nil }
 }

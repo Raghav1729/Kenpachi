@@ -164,6 +164,7 @@ struct ContentDetailView: View {
             store: Store(
               initialState: PlayerFeature.State(
                 content: content,
+                season: viewStore.selectedSeason,
                 episode: viewStore.selectedEpisode,
                 streamingLinks: viewStore.streamingLinks
               )
@@ -184,6 +185,7 @@ struct ContentDetailView: View {
           DownloadSelectionSheet(
             content: content,
             seasons: content.seasons,
+            selectedSeason: viewStore.selectedSeason,
             selectedEpisode: viewStore.selectedEpisode,
             onDownload: { selection in
               viewStore.send(.downloadSelectionConfirmed(selection))

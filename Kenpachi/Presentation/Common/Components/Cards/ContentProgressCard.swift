@@ -71,7 +71,7 @@ struct ContentProgressCard: View {
                   Image(systemName: "film")
                     .font(.title)
                     .foregroundColor(.textTertiary)
-                  Text(entry.contentId)
+                  Text(entry.title ?? entry.contentId)
                     .font(.captionMedium)
                     .foregroundColor(.textSecondary)
                     .lineLimit(1)
@@ -119,14 +119,18 @@ struct ContentProgressCard: View {
         if showTitle {
           VStack(alignment: .leading, spacing: 4) {
             /// Content title
-            Text(entry.contentId) // Will be updated when content is fetched
+            Text(entry.title ?? entry.contentId) // Will be updated when content is fetched
               .font(.labelMedium)
               .foregroundColor(.textPrimary)
               .lineLimit(1)
             
             /// Episode info and progress
             HStack(spacing: 8) {
-              if let episodeId = entry.episodeId {
+              if let seasonNumber = entry.seasonNumber, let episodeNumber = entry.episodeNumber {
+                Text("S\(String(format: "%02d", seasonNumber))E\(String(format: "%02d", episodeNumber))")
+                  .font(.captionMedium)
+                  .foregroundColor(.textSecondary)
+              } else if let episodeId = entry.episodeId {
                 Text(episodeId)
                   .font(.captionMedium)
                   .foregroundColor(.textSecondary)
@@ -175,63 +179,13 @@ struct RoundedCorner: Shape {
   }
 }
 
-/// Preview provider for ContentProgressCard
-#Preview("With Content") {
-  ContentProgressCard(
-    entry: WatchHistoryEntry(
-      contentId: "movie-123",
-      episodeId: nil,
-      scraperSource: "FlixHQ",
-      fullPosterURL: URL(string: "https://image.tmdb.org/t/p/w500/example.jpg"),
-      progress: 0.65,
-      currentTime: 3900,
-      duration: 6000
-    ),
-    onTapped: {}
-  )
-  .padding()
-  .background(Color.appBackground)
-}
-
-#Preview("With Episode") {
-  ContentProgressCard(
-    entry: WatchHistoryEntry(
-      contentId: "show-456",
-      episodeId: "S01E05",
-      scraperSource: "FlixHQ",
-      fullPosterURL: URL(string: "https://image.tmdb.org/t/p/w500/example.jpg"),
-      progress: 0.45,
-      currentTime: 1080,
-      duration: 2400
-    ),
-    onTapped: {},
-    onRemove: {}
-  )
-  .padding()
-  .background(Color.appBackground)
-}
-
-#Preview("Without Content Data") {
-  ContentProgressCard(
-    entry: WatchHistoryEntry(
-      contentId: "unknown-content",
-      scraperSource: "FlixHQ",
-      progress: 0.30,
-      currentTime: 1800,
-      duration: 6000
-    ),
-    onTapped: {}
-  )
-  .padding()
-  .background(Color.appBackground)
-}
-
 #Preview("Multiple Cards") {
   ScrollView(.horizontal, showsIndicators: false) {
     HStack(spacing: 16) {
       ContentProgressCard(
         entry: WatchHistoryEntry(
           contentId: "movie-1",
+          title: "Movie One",
           scraperSource: "FlixHQ",
           fullPosterURL: URL(string: "https://image.tmdb.org/t/p/w500/example1.jpg"),
           progress: 0.25,
@@ -245,7 +199,10 @@ struct RoundedCorner: Shape {
       ContentProgressCard(
         entry: WatchHistoryEntry(
           contentId: "show-2",
+          title: "Sample Show - S01E02 - Second Episode",
           episodeId: "S01E02",
+          seasonNumber: 1,
+          episodeNumber: 2,
           scraperSource: "FlixHQ",
           fullPosterURL: URL(string: "https://image.tmdb.org/t/p/w500/example2.jpg"),
           progress: 0.75,
@@ -259,11 +216,28 @@ struct RoundedCorner: Shape {
       ContentProgressCard(
         entry: WatchHistoryEntry(
           contentId: "movie-3",
+          title: "Movie Three",
           scraperSource: "FlixHQ",
           fullPosterURL: URL(string: "https://image.tmdb.org/t/p/w500/example3.jpg"),
           progress: 0.45,
           currentTime: 2700,
           duration: 6000
+        ),
+        onTapped: {}
+      )
+      
+      ContentProgressCard(
+        entry: WatchHistoryEntry(
+          contentId: "show-4",
+          title: "Sample Show - S02E05 - Fifth Episode",
+          episodeId: "S02E05",
+          seasonNumber: 2,
+          episodeNumber: 5,
+          scraperSource: "FlixHQ",
+          fullPosterURL: URL(string: "https://image.tmdb.org/t/p/w500/example4.jpg"),
+          progress: 0.35,
+          currentTime: 1200,
+          duration: 3400
         ),
         onTapped: {}
       )

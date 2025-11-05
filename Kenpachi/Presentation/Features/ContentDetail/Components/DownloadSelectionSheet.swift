@@ -10,6 +10,8 @@ struct DownloadSelectionSheet: View {
   let content: Content
   /// Available seasons (for TV shows)
   let seasons: [Season]?
+  /// Pre-selected season (if downloading from season button)
+  let selectedSeason: Season?
   /// Pre-selected episode (if downloading from episode button)
   let selectedEpisode: Episode?
   /// Callback when download is requested
@@ -120,6 +122,7 @@ struct DownloadSelectionSheet: View {
 
     let selection = DownloadSelection(
       content: content,
+      season: selectedSeason,
       episode: selectedEpisode,
       quality: quality,
       stream: stream
@@ -354,6 +357,7 @@ struct ErrorSection: View {
 /// Model representing a download selection
 struct DownloadSelection: Equatable {
   let content: Content
+  let season: Season?
   let episode: Episode?
   let quality: DownloadQuality
   let stream: ExtractedLink

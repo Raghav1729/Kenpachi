@@ -65,31 +65,6 @@ struct ContentPosterCard: View {
           .cornerRadius(.radiusS / 2)
           .padding(.spacingXS + 2)
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-          /// Premium badge for special content (top-right corner - Hotstar style)
-          if content.adult || content.rating == "Premium" {
-            HStack(spacing: .spacingXS / 2) {
-              Image(systemName: "crown.fill")
-                .font(.captionSmall)
-              Text("content.vip")
-                .font(.captionSmall)
-                .fontWeight(.bold)
-                .tracking(0.5)
-            }
-            .foregroundColor(.black)
-            .padding(.horizontal, .spacingXS + 2)
-            .padding(.vertical, .spacingXS / 2)
-            .background(
-              LinearGradient(
-                colors: [Color.warning, Color.orange],
-                startPoint: .leading,
-                endPoint: .trailing
-              )
-            )
-            .cornerRadius(.radiusS / 2)
-            .padding(.spacingXS + 2)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-          }
         }
         .frame(width: width, height: height)
 

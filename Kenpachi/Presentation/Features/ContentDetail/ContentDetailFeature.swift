@@ -343,6 +343,7 @@ struct ContentDetailFeature {
           // Create download
           let download = Download(
             content: selection.content,
+            season: selection.season,
             episode: selection.episode,
             state: .pending,
             quality: selection.quality,
