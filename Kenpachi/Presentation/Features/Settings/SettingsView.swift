@@ -1,25 +1,22 @@
 // SettingsView.swift
-// Settings screen UI
-// Comprehensive settings similar to Disney Plus Hotstar
+// Settings screen UI with comprehensive options
+// Disney+ Hotstar inspired design with full integration
 
-// Added comment to trigger recompilation
 import ComposableArchitecture
 import SwiftUI
 
 struct SettingsView: View {
-  /// TCA store for Settings feature
   @Bindable var store: StoreOf<SettingsFeature>
-  /// SwiftUI environment dismiss action
   @SwiftUI.Environment(\.dismiss) var dismiss: DismissAction
 
   var body: some View {
     NavigationStack {
       contentView
-        .navigationTitle("settings.title")
+        .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
           ToolbarItem(placement: .navigationBarTrailing) {
-            Button("settings.done") {
+            Button("Done") {
               dismiss()
             }
             .foregroundColor(.primaryBlue)
@@ -38,394 +35,423 @@ struct SettingsView: View {
       Color.appBackground.ignoresSafeArea()
 
       if store.isLoadingSettings {
-        LoadingView()
+        LoadingView(message: "Loading settings...")
       } else {
         ScrollView {
           VStack(spacing: .spacingL) {
-            /// General section
-            SettingsSection(title: "settings.general.title") {
-              SettingsRow(
-                icon: "paintbrush.fill",
-                title: "settings.general.theme",
-                value: store.selectedTheme.displayName
-              ) {
-                ThemePicker(selection: $store.selectedTheme.sending(\.themeChanged))
-              }
-
-              SettingsRow(
-                icon: "paintpalette.fill",
-                title: "settings.general.accent_color",
-                value: store.accentColor.displayName
-              ) {
-                AccentColorPicker(selection: $store.accentColor.sending(\.accentColorChanged))
-              }
-            }
-
-            /// Security section
-            SettingsSection(title: "settings.security.title") {
-              SettingsToggleRow(
-                icon: "faceid",
-                title: "settings.security.biometric_auth",
-                subtitle: "settings.security.biometric_auth_subtitle",
-                isOn: $store.biometricAuthEnabled.sending(\.biometricAuthToggled)
-              )
-
-              if store.biometricAuthEnabled {
-                SettingsRow(
-                  icon: "lock.fill",
-                  title: "settings.security.auto_lock",
-                  value: store.autoLockTimeout.displayName
-                ) {
-                  AutoLockPicker(
-                    selection: $store.autoLockTimeout.sending(\.autoLockTimeoutChanged))
-                }
-              }
-            }
-
-            /// Content preferences section
-            SettingsSection(title: "settings.content.title") {
-              SettingsRow(
-                icon: "server.rack",
-                title: "settings.content.scraper_source",
-                subtitle: "settings.content.scraper_source_subtitle",
-                value: store.defaultScraperSource.displayName
-              ) {
-                ScraperSourcePicker(
-                  selection: $store.defaultScraperSource.sending(\.scraperSourceChanged))
-              }
-
-              SettingsRow(
-                icon: "globe",
-                title: "settings.content.language",
-                value: store.preferredLanguage.displayName
-              ) {
-                LanguagePicker(
-                  selection: $store.preferredLanguage.sending(\.preferredLanguageChanged))
-              }
-
-              SettingsToggleRow(
-                icon: "18.circle.fill",
-                title: "settings.content.adult_content",
-                subtitle: "settings.content.adult_content_subtitle",
-                isOn: $store.showAdultContent.sending(\.showAdultContentToggled)
-              )
-            }
-
-            /// Parental Controls section
-            SettingsSection(title: "settings.parental_controls.title") {
-              SettingsToggleRow(
-                icon: "person.2.fill",
-                title: "settings.parental_controls.enable",
-                isOn: $store.parentalControlsEnabled.sending(\.parentalControlsToggled)
-              )
-
-              if store.parentalControlsEnabled {
-                SettingsRow(
-                  icon: "shield.lefthalf.filled",
-                  title: "settings.parental_controls.allowed_rating",
-                  value: store.allowedContentRating.displayName
-                ) {
-                  ContentRatingPicker(
-                    selection: $store.allowedContentRating.sending(\.allowedContentRatingChanged))
-                }
-              }
-            }
-
-            /// Player settings section
-            SettingsSection(title: "settings.player.title") {
-              SettingsToggleRow(
-                icon: "play.circle.fill",
-                title: "settings.player.autoplay",
-                subtitle: "settings.player.autoplay_subtitle",
-                isOn: $store.autoPlayEnabled.sending(\.autoPlayToggled)
-              )
-
-              SettingsToggleRow(
-                icon: "film.fill",
-                title: "settings.player.autoplay_trailers",
-                subtitle: "settings.player.autoplay_trailers_subtitle",
-                isOn: $store.autoPlayTrailers.sending(\.autoPlayTrailersToggled)
-              )
-
-              SettingsRow(
-                icon: "video.fill",
-                title: "settings.player.default_quality",
-                value: store.defaultQuality.displayName
-              ) {
-                QualityPicker(selection: $store.defaultQuality.sending(\.defaultQualityChanged))
-              }
-
-              SettingsToggleRow(
-                icon: "captions.bubble.fill",
-                title: "settings.player.subtitles",
-                isOn: $store.subtitlesEnabled.sending(\.subtitlesToggled)
-              )
-
-              if store.subtitlesEnabled {
-                SettingsRow(
-                  icon: "text.bubble.fill",
-                  title: "settings.player.subtitle_language",
-                  value: store.preferredSubtitleLanguage.displayName
-                ) {
-                  SubtitleLanguagePicker(
-                    selection: $store.preferredSubtitleLanguage.sending(\.subtitleLanguageChanged)
-                  )
-                }
-              }
-
-              SettingsRow(
-                icon: "speaker.wave.2.fill",
-                title: "settings.player.audio_language",
-                value: store.preferredAudioLanguage.displayName
-              ) {
-                AudioLanguagePicker(
-                  selection: $store.preferredAudioLanguage.sending(\.audioLanguageChanged))
-              }
-
-              SettingsRow(
-                icon: "speedometer",
-                title: "settings.player.playback_speed",
-                value: store.playbackSpeed.displayName
-              ) {
-                PlaybackSpeedPicker(
-                  selection: $store.playbackSpeed.sending(\.playbackSpeedChanged))
-              }
-            }
-
-            /// Download settings section
-            SettingsSection(title: "settings.downloads.title") {
-              SettingsRow(
-                icon: "arrow.down.circle.fill",
-                title: "settings.downloads.quality",
-                value: store.downloadQuality.displayName
-              ) {
-                QualityPicker(
-                  selection: $store.downloadQuality.sending(\.downloadQualityChanged))
-              }
-
-              SettingsToggleRow(
-                icon: "antenna.radiowaves.left.and.right",
-                title: "settings.downloads.cellular",
-                subtitle: "settings.downloads.cellular_subtitle",
-                isOn: $store.downloadOverCellular.sending(\.downloadOverCellularToggled)
-              )
-
-              SettingsToggleRow(
-                icon: "trash.fill",
-                title: "settings.downloads.auto_delete",
-                subtitle: "settings.downloads.auto_delete_subtitle",
-                isOn: $store.autoDeleteWatchedDownloads.sending(\.autoDeleteWatchedToggled)
-              )
-            }
-
-            /// Notifications section
-            SettingsSection(title: "settings.notifications.title") {
-              SettingsToggleRow(
-                icon: "bell.fill",
-                title: "settings.notifications.push",
-                subtitle: "settings.notifications.push_subtitle",
-                isOn: $store.pushNotificationsEnabled.sending(\.pushNotificationsToggled)
-              )
-
-              if store.pushNotificationsEnabled {
-                SettingsToggleRow(
-                  icon: "sparkles",
-                  title: "settings.notifications.new_content",
-                  isOn: $store.newContentNotifications.sending(\.newContentNotificationsToggled)
-                )
-
-                SettingsToggleRow(
-                  icon: "checkmark.circle.fill",
-                  title: "settings.notifications.downloads",
-                  isOn: $store.downloadCompleteNotifications.sending(
-                    \.downloadNotificationsToggled)
-                )
-
-                SettingsToggleRow(
-                  icon: "star.fill",
-                  title: "settings.notifications.recommendations",
-                  isOn: $store.recommendationNotifications.sending(
-                    \.recommendationNotificationsToggled)
-                )
-              }
-            }
-
-            /// Streaming section
-            SettingsSection(title: "settings.streaming.title") {
-              SettingsToggleRow(
-                icon: "airplayvideo",
-                title: "settings.streaming.airplay",
-                subtitle: "settings.streaming.airplay_subtitle",
-                isOn: $store.airPlayEnabled.sending(\.airPlayToggled)
-              )
-
-              SettingsToggleRow(
-                icon: "tv.fill",
-                title: "settings.streaming.chromecast",
-                subtitle: "settings.streaming.chromecast_subtitle",
-                isOn: $store.chromecastEnabled.sending(\.chromecastToggled)
-              )
-
-              SettingsToggleRow(
-                icon: "pip.fill",
-                title: "settings.streaming.pip",
-                subtitle: "settings.streaming.pip_subtitle",
-                isOn: $store.pipEnabled.sending(\.pipToggled)
-              )
-            }
-
-            /// Privacy section
-            SettingsSection(title: "settings.privacy.title") {
-              SettingsToggleRow(
-                icon: "chart.bar.fill",
-                title: "settings.privacy.analytics",
-                subtitle: "settings.privacy.analytics_subtitle",
-                isOn: $store.analyticsEnabled.sending(\.analyticsToggled)
-              )
-
-              SettingsToggleRow(
-                icon: "exclamationmark.triangle.fill",
-                title: "settings.privacy.crash_reporting",
-                subtitle: "settings.privacy.crash_reporting_subtitle",
-                isOn: $store.crashReportingEnabled.sending(\.crashReportingToggled)
-              )
-
-              SettingsToggleRow(
-                icon: "sparkles.rectangle.stack.fill",
-                title: "settings.privacy.personalized",
-                subtitle: "settings.privacy.personalized_subtitle",
-                isOn: $store.personalizedRecommendations.sending(
-                  \.personalizedRecommendationsToggled)
-              )
-
-              SettingsToggleRow(
-                icon: "clock.arrow.circlepath",
-                title: "settings.privacy.search_history",
-                subtitle: "settings.privacy.search_history_subtitle",
-                isOn: $store.searchHistoryEnabled.sending(\.searchHistoryToggled)
-              )
-
-              if store.searchHistoryEnabled {
-                SettingsButtonRow(
-                  icon: "trash.fill",
-                  title: "settings.privacy.clear_search_history",
-                  style: .destructive
-                ) {
-                  store.send(.clearSearchHistoryTapped)
-                }
-              }
-            }
-
-            /// Storage section
-            SettingsSection(title: "settings.storage.title") {
-              StorageInfoRow(
-                icon: "internaldrive.fill",
-                title: "settings.storage.total_used",
-                size: store.totalStorageUsed
-              )
-
-              StorageInfoRow(
-                icon: "square.stack.3d.up.fill",
-                title: "settings.storage.cache",
-                size: store.cacheSize
-              )
-
-              StorageInfoRow(
-                icon: "photo.stack.fill",
-                title: "settings.storage.image_cache",
-                size: store.imageCacheSize
-              )
-
-              StorageInfoRow(
-                icon: "arrow.down.circle.fill",
-                title: "settings.storage.downloads",
-                size: store.downloadsSize
-              )
-
-              SettingsButtonRow(
-                icon: "trash.fill",
-                title: "settings.storage.clear_cache",
-                style: .destructive,
-                isLoading: store.isClearingCache
-              ) {
-                store.send(.clearCacheTapped)
-              }
-
-              SettingsButtonRow(
-                icon: "trash.fill",
-                title: "settings.storage.clear_image_cache",
-                style: .destructive,
-                isLoading: store.isClearingImageCache
-              ) {
-                store.send(.clearImageCacheTapped)
-              }
-            }
-
-            /// About section
-            SettingsSection(title: "settings.about.title") {
-              SettingsInfoRow(
-                icon: "info.circle.fill",
-                title: "settings.about.version",
-                value: "\(store.appVersion) (\(store.buildNumber))"
-              )
-
-              SettingsButtonRow(
-                icon: "questionmark.circle.fill",
-                title: "settings.about.help"
-              ) {
-                store.send(.helpTapped)
-              }
-
-              SettingsButtonRow(
-                icon: "doc.text.fill",
-                title: "settings.about.privacy_policy"
-              ) {
-                store.send(.privacyPolicyTapped)
-              }
-
-              SettingsButtonRow(
-                icon: "doc.plaintext.fill",
-                title: "settings.about.terms"
-              ) {
-                store.send(.termsOfServiceTapped)
-              }
-            }
-
-            /// Support button (Hotstar style)
-            /// Opens GitHub sponsors page when tapped
-            Button {
-              store.send(.supportTapped)
-            } label: {
-              HStack(spacing: .spacingS) {
-                Image(systemName: "heart.fill")
-                  .font(.labelLarge)
-                Text("settings.support")
-                  .font(.labelLarge)
-                  .fontWeight(.medium)
-              }
-              .foregroundColor(.white)
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, .spacingM)
-              .background(Color.primaryBlue)
-              .cornerRadius(.radiusM)
-            }
-            .padding(.horizontal, .spacingM)
-            .padding(.vertical, .spacingS)
+            generalSection
+            securitySection
+            contentPreferencesSection
+            parentalControlsSection
+            playerSettingsSection
+            downloadSettingsSection
+            notificationsSection
+            streamingSection
+            privacySection
+            storageSection
+            aboutSection
+            supportButton
           }
+          .padding(.bottom, .spacingL)
         }
       }
     }
   }
+
+  // MARK: - General Section
+  private var generalSection: some View {
+    SettingsSection(title: "General") {
+      SettingsRow(
+        icon: "paintbrush.fill",
+        title: "Theme",
+        value: store.selectedTheme.displayName
+      ) {
+        ThemePicker(selection: $store.selectedTheme.sending(\.themeChanged))
+      }
+
+      SettingsRow(
+        icon: "paintpalette.fill",
+        title: "Accent Color",
+        value: store.accentColor.displayName
+      ) {
+        AccentColorPicker(selection: $store.accentColor.sending(\.accentColorChanged))
+      }
+    }
+  }
+
+  // MARK: - Security Section
+  private var securitySection: some View {
+    SettingsSection(title: "Security") {
+      SettingsToggleRow(
+        icon: "faceid",
+        title: "Biometric Authentication",
+        subtitle: "Use Face ID or Touch ID to unlock",
+        isOn: $store.biometricAuthEnabled.sending(\.biometricAuthToggled)
+      )
+
+      if store.biometricAuthEnabled {
+        SettingsRow(
+          icon: "lock.fill",
+          title: "Auto Lock",
+          value: store.autoLockTimeout.displayName
+        ) {
+          AutoLockPicker(selection: $store.autoLockTimeout.sending(\.autoLockTimeoutChanged))
+        }
+      }
+    }
+  }
+
+  // MARK: - Content Preferences Section
+  private var contentPreferencesSection: some View {
+    SettingsSection(title: "Content Preferences") {
+      SettingsRow(
+        icon: "server.rack",
+        title: "Scraper Source",
+        subtitle: "Default content provider",
+        value: store.defaultScraperSource.displayName
+      ) {
+        ScraperSourcePicker(
+          selection: $store.defaultScraperSource.sending(\.scraperSourceChanged))
+      }
+
+      SettingsRow(
+        icon: "globe",
+        title: "Preferred Language",
+        value: store.preferredLanguage.displayName
+      ) {
+        LanguagePicker(selection: $store.preferredLanguage.sending(\.preferredLanguageChanged))
+      }
+
+      SettingsToggleRow(
+        icon: "18.circle.fill",
+        title: "Show Adult Content",
+        subtitle: "Display mature content in search results",
+        isOn: $store.showAdultContent.sending(\.showAdultContentToggled)
+      )
+    }
+  }
+
+  // MARK: - Parental Controls Section
+  private var parentalControlsSection: some View {
+    SettingsSection(title: "Parental Controls") {
+      SettingsToggleRow(
+        icon: "person.2.fill",
+        title: "Enable Parental Controls",
+        isOn: $store.parentalControlsEnabled.sending(\.parentalControlsToggled)
+      )
+
+      if store.parentalControlsEnabled {
+        SettingsRow(
+          icon: "shield.lefthalf.filled",
+          title: "Allowed Content Rating",
+          value: store.allowedContentRating.displayName
+        ) {
+          ContentRatingPicker(
+            selection: $store.allowedContentRating.sending(\.allowedContentRatingChanged))
+        }
+      }
+    }
+  }
+
+  // MARK: - Player Settings Section
+  private var playerSettingsSection: some View {
+    SettingsSection(title: "Player Settings") {
+      SettingsToggleRow(
+        icon: "play.circle.fill",
+        title: "Auto-Play Next Episode",
+        subtitle: "Automatically play next episode",
+        isOn: $store.autoPlayEnabled.sending(\.autoPlayToggled)
+      )
+
+      SettingsToggleRow(
+        icon: "film.fill",
+        title: "Auto-Play Trailers",
+        subtitle: "Play trailers on detail pages",
+        isOn: $store.autoPlayTrailers.sending(\.autoPlayTrailersToggled)
+      )
+
+      SettingsRow(
+        icon: "video.fill",
+        title: "Default Quality",
+        value: store.defaultQuality.displayName
+      ) {
+        QualityPicker(selection: $store.defaultQuality.sending(\.defaultQualityChanged))
+      }
+
+      SettingsToggleRow(
+        icon: "captions.bubble.fill",
+        title: "Subtitles",
+        isOn: $store.subtitlesEnabled.sending(\.subtitlesToggled)
+      )
+
+      if store.subtitlesEnabled {
+        SettingsRow(
+          icon: "text.bubble.fill",
+          title: "Subtitle Language",
+          value: store.preferredSubtitleLanguage.displayName
+        ) {
+          SubtitleLanguagePicker(
+            selection: $store.preferredSubtitleLanguage.sending(\.subtitleLanguageChanged))
+        }
+      }
+
+      SettingsRow(
+        icon: "speaker.wave.2.fill",
+        title: "Audio Language",
+        value: store.preferredAudioLanguage.displayName
+      ) {
+        AudioLanguagePicker(
+          selection: $store.preferredAudioLanguage.sending(\.audioLanguageChanged))
+      }
+
+      SettingsRow(
+        icon: "speedometer",
+        title: "Playback Speed",
+        value: store.playbackSpeed.displayName
+      ) {
+        PlaybackSpeedPicker(selection: $store.playbackSpeed.sending(\.playbackSpeedChanged))
+      }
+    }
+  }
+
+  // MARK: - Download Settings Section
+  private var downloadSettingsSection: some View {
+    SettingsSection(title: "Downloads") {
+      SettingsRow(
+        icon: "arrow.down.circle.fill",
+        title: "Download Quality",
+        value: store.downloadQuality.displayName
+      ) {
+        QualityPicker(selection: $store.downloadQuality.sending(\.downloadQualityChanged))
+      }
+
+      SettingsToggleRow(
+        icon: "antenna.radiowaves.left.and.right",
+        title: "Download Over Cellular",
+        subtitle: "Allow downloads on mobile data",
+        isOn: $store.downloadOverCellular.sending(\.downloadOverCellularToggled)
+      )
+
+      SettingsToggleRow(
+        icon: "trash.fill",
+        title: "Auto-Delete Watched",
+        subtitle: "Remove downloads after watching",
+        isOn: $store.autoDeleteWatchedDownloads.sending(\.autoDeleteWatchedToggled)
+      )
+    }
+  }
+
+  // MARK: - Notifications Section
+  private var notificationsSection: some View {
+    SettingsSection(title: "Notifications") {
+      SettingsToggleRow(
+        icon: "bell.fill",
+        title: "Push Notifications",
+        subtitle: "Receive app notifications",
+        isOn: $store.pushNotificationsEnabled.sending(\.pushNotificationsToggled)
+      )
+
+      if store.pushNotificationsEnabled {
+        SettingsToggleRow(
+          icon: "sparkles",
+          title: "New Content",
+          isOn: $store.newContentNotifications.sending(\.newContentNotificationsToggled)
+        )
+
+        SettingsToggleRow(
+          icon: "checkmark.circle.fill",
+          title: "Download Complete",
+          isOn: $store.downloadCompleteNotifications.sending(\.downloadNotificationsToggled)
+        )
+
+        SettingsToggleRow(
+          icon: "star.fill",
+          title: "Recommendations",
+          isOn: $store.recommendationNotifications.sending(\.recommendationNotificationsToggled)
+        )
+      }
+    }
+  }
+
+  // MARK: - Streaming Section
+  private var streamingSection: some View {
+    SettingsSection(title: "Streaming") {
+      SettingsToggleRow(
+        icon: "airplayvideo",
+        title: "AirPlay",
+        subtitle: "Stream to Apple TV and AirPlay devices",
+        isOn: $store.airPlayEnabled.sending(\.airPlayToggled)
+      )
+
+      SettingsToggleRow(
+        icon: "tv.fill",
+        title: "Chromecast",
+        subtitle: "Cast to Chromecast devices",
+        isOn: $store.chromecastEnabled.sending(\.chromecastToggled)
+      )
+
+      SettingsToggleRow(
+        icon: "pip.fill",
+        title: "Picture in Picture",
+        subtitle: "Watch while using other apps",
+        isOn: $store.pipEnabled.sending(\.pipToggled)
+      )
+    }
+  }
+
+  // MARK: - Privacy Section
+  private var privacySection: some View {
+    SettingsSection(title: "Privacy") {
+      SettingsToggleRow(
+        icon: "chart.bar.fill",
+        title: "Analytics",
+        subtitle: "Help improve the app",
+        isOn: $store.analyticsEnabled.sending(\.analyticsToggled)
+      )
+
+      SettingsToggleRow(
+        icon: "exclamationmark.triangle.fill",
+        title: "Crash Reporting",
+        subtitle: "Send crash reports",
+        isOn: $store.crashReportingEnabled.sending(\.crashReportingToggled)
+      )
+
+      SettingsToggleRow(
+        icon: "sparkles.rectangle.stack.fill",
+        title: "Personalized Recommendations",
+        subtitle: "Based on your viewing history",
+        isOn: $store.personalizedRecommendations.sending(\.personalizedRecommendationsToggled)
+      )
+
+      SettingsToggleRow(
+        icon: "clock.arrow.circlepath",
+        title: "Search History",
+        subtitle: "Save recent searches",
+        isOn: $store.searchHistoryEnabled.sending(\.searchHistoryToggled)
+      )
+
+      if store.searchHistoryEnabled {
+        SettingsButtonRow(
+          icon: "trash.fill",
+          title: "Clear Search History",
+          style: .destructive
+        ) {
+          store.send(.clearSearchHistoryTapped)
+        }
+      }
+    }
+  }
+
+  // MARK: - Storage Section
+  private var storageSection: some View {
+    SettingsSection(title: "Storage") {
+      StorageInfoRow(
+        icon: "internaldrive.fill",
+        title: "Total Used",
+        size: store.totalStorageUsed
+      )
+
+      StorageInfoRow(
+        icon: "square.stack.3d.up.fill",
+        title: "Cache",
+        size: store.cacheSize
+      )
+
+      StorageInfoRow(
+        icon: "photo.stack.fill",
+        title: "Image Cache",
+        size: store.imageCacheSize
+      )
+
+      StorageInfoRow(
+        icon: "arrow.down.circle.fill",
+        title: "Downloads",
+        size: store.downloadsSize
+      )
+
+      SettingsButtonRow(
+        icon: "trash.fill",
+        title: "Clear Cache",
+        style: .destructive,
+        isLoading: store.isClearingCache
+      ) {
+        store.send(.clearCacheTapped)
+      }
+
+      SettingsButtonRow(
+        icon: "trash.fill",
+        title: "Clear Image Cache",
+        style: .destructive,
+        isLoading: store.isClearingImageCache
+      ) {
+        store.send(.clearImageCacheTapped)
+      }
+    }
+  }
+
+  // MARK: - About Section
+  private var aboutSection: some View {
+    SettingsSection(title: "About") {
+      SettingsInfoRow(
+        icon: "info.circle.fill",
+        title: "Version",
+        value: "\(store.appVersion) (\(store.buildNumber))"
+      )
+
+      SettingsButtonRow(
+        icon: "questionmark.circle.fill",
+        title: "Help & Support"
+      ) {
+        store.send(.helpTapped)
+      }
+
+      SettingsButtonRow(
+        icon: "doc.text.fill",
+        title: "Privacy Policy"
+      ) {
+        store.send(.privacyPolicyTapped)
+      }
+
+      SettingsButtonRow(
+        icon: "doc.plaintext.fill",
+        title: "Terms of Service"
+      ) {
+        store.send(.termsOfServiceTapped)
+      }
+    }
+  }
+
+  // MARK: - Support Button
+  private var supportButton: some View {
+    Button {
+      store.send(.supportTapped)
+    } label: {
+      HStack(spacing: .spacingS) {
+        Image(systemName: "heart.fill")
+          .font(.labelLarge)
+        Text("Support Development")
+          .font(.labelLarge)
+          .fontWeight(.medium)
+      }
+      .foregroundColor(.white)
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, .spacingM)
+      .background(Color.primaryBlue)
+      .cornerRadius(.radiusM)
+    }
+    .padding(.horizontal, .spacingM)
+    .padding(.vertical, .spacingS)
+  }
 }
 
-// MARK: - Settings Section (Hotstar Style - Compact)
+// MARK: - Settings Section
 struct SettingsSection<Content: View>: View {
   let title: String
   @ViewBuilder let content: () -> Content
 
   var body: some View {
     VStack(alignment: .leading, spacing: .spacingS) {
-      Text(LocalizedStringKey(title))
+      Text(title)
         .font(.labelMedium)
         .foregroundColor(.textSecondary)
         .textCase(.uppercase)
@@ -443,7 +469,7 @@ struct SettingsSection<Content: View>: View {
   }
 }
 
-// MARK: - Settings Info Row (non-navigable - Hotstar Style)
+// MARK: - Settings Info Row
 struct SettingsInfoRow: View {
   let icon: String
   let title: String
@@ -458,12 +484,12 @@ struct SettingsInfoRow: View {
         .frame(width: 24)
 
       VStack(alignment: .leading, spacing: .spacingXS / 2) {
-        Text(LocalizedStringKey(title))
+        Text(title)
           .font(.bodyMedium)
           .foregroundColor(.textPrimary)
 
         if let subtitle = subtitle {
-          Text(LocalizedStringKey(subtitle))
+          Text(subtitle)
             .font(.captionMedium)
             .foregroundColor(.textSecondary)
         }
@@ -483,7 +509,7 @@ struct SettingsInfoRow: View {
   }
 }
 
-// MARK: - Settings Row (navigable - Hotstar Style)
+// MARK: - Settings Row
 struct SettingsRow<Destination: View>: View {
   let icon: String
   let title: String
@@ -502,12 +528,12 @@ struct SettingsRow<Destination: View>: View {
           .frame(width: 24)
 
         VStack(alignment: .leading, spacing: .spacingXS / 2) {
-          Text(LocalizedStringKey(title))
+          Text(title)
             .font(.bodyMedium)
             .foregroundColor(.textPrimary)
 
           if let subtitle = subtitle {
-            Text(LocalizedStringKey(subtitle))
+            Text(subtitle)
               .font(.captionMedium)
               .foregroundColor(.textSecondary)
           }
@@ -532,7 +558,7 @@ struct SettingsRow<Destination: View>: View {
   }
 }
 
-// MARK: - Settings Toggle Row (Hotstar Style)
+// MARK: - Settings Toggle Row
 struct SettingsToggleRow: View {
   let icon: String
   let title: String
@@ -547,12 +573,12 @@ struct SettingsToggleRow: View {
         .frame(width: 24)
 
       VStack(alignment: .leading, spacing: .spacingXS / 2) {
-        Text(LocalizedStringKey(title))
+        Text(title)
           .font(.bodyMedium)
           .foregroundColor(.textPrimary)
 
         if let subtitle = subtitle {
-          Text(LocalizedStringKey(subtitle))
+          Text(subtitle)
             .font(.captionMedium)
             .foregroundColor(.textSecondary)
         }
@@ -570,7 +596,7 @@ struct SettingsToggleRow: View {
   }
 }
 
-// MARK: - Settings Button Row (Hotstar Style)
+// MARK: - Settings Button Row
 struct SettingsButtonRow: View {
   let icon: String
   let title: String
@@ -591,7 +617,7 @@ struct SettingsButtonRow: View {
           .foregroundColor(style == .destructive ? .error : .primaryBlue)
           .frame(width: 24)
 
-        Text(LocalizedStringKey(title))
+        Text(title)
           .font(.bodyMedium)
           .foregroundColor(style == .destructive ? .error : .textPrimary)
 
@@ -614,7 +640,7 @@ struct SettingsButtonRow: View {
   }
 }
 
-// MARK: - Storage Info Row (Hotstar Style)
+// MARK: - Storage Info Row
 struct StorageInfoRow: View {
   let icon: String
   let title: String
@@ -627,7 +653,7 @@ struct StorageInfoRow: View {
         .foregroundColor(.primaryBlue)
         .frame(width: 24)
 
-      Text(LocalizedStringKey(title))
+      Text(title)
         .font(.bodyMedium)
         .foregroundColor(.textPrimary)
 

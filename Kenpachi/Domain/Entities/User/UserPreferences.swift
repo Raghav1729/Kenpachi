@@ -186,6 +186,23 @@ enum PlaybackSpeed: Double, Equatable, Codable, CaseIterable {
   }
 }
 
+/// Content rating for parental controls
+enum ContentRating: String, CaseIterable, Equatable, Codable {
+  case unrestricted
+  case pg13
+  case pg
+  case g
+  
+  var displayName: String {
+    switch self {
+    case .unrestricted: return "Unrestricted"
+    case .pg13: return "PG-13"
+    case .pg: return "PG"
+    case .g: return "G"
+    }
+  }
+}
+
 /// Represents comprehensive user preferences for the app
 struct UserPreferences: Equatable, Codable {
   /// Theme and appearance
