@@ -59,4 +59,18 @@ enum DownloadQuality: String, Codable, Equatable, CaseIterable, Identifiable {
       return 15000
     }
   }
+  
+  /// Sort order for quality comparison (higher is better)
+  var sortOrder: Int {
+    switch self {
+    case .sd480:
+      return 1
+    case .hd720:
+      return 2
+    case .hd1080:
+      return 3
+    case .uhd4k:
+      return 4
+    }
+  }
 }

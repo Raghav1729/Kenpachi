@@ -139,7 +139,7 @@ struct ContentDetailFeature {
         return .run { [contentId = state.contentId, type = state.type] send in
           do {
             // Create an instance of the `ContentRepository`.
-            let contentRepository = ContentRepository()
+            let contentRepository = await ContentRepository()
 
             // Fetch the content details from the repository.
             let content = try await contentRepository.fetchContentDetails(id: contentId, type: type)
@@ -174,7 +174,8 @@ struct ContentDetailFeature {
             await send(.watchlistStatusLoaded(isInWatchlist))
           } catch {
             // If an error occurs, log a warning message.
-            AppLogger.shared.log("Failed to check watchlist status: \(error)", level: .warning)
+            await AppLogger.shared.log(
+              "Failed to check watchlist status: \(error)", level: .warning)
           }
         }
 
@@ -235,7 +236,7 @@ struct ContentDetailFeature {
         return .run { [contentId = state.contentId, episodeId] send in
           do {
             // Create an instance of the `ContentRepository`.
-            let contentRepository = ContentRepository()
+            let contentRepository = await ContentRepository()
 
             // Extract the streaming links from the repository.
             let links = try await contentRepository.extractStreamingLinks(
@@ -281,14 +282,15 @@ struct ContentDetailFeature {
         return .run { [content = state.content] send in
           do {
             guard let content = content else {
-              AppLogger.shared.log("Cannot add to watchlist: Content not loaded", level: .error)
+              await AppLogger.shared.log(
+                "Cannot add to watchlist: Content not loaded", level: .error)
               await send(.watchlistToggled(false))
               return
             }
             try await WatchlistManager.shared.addToWatchlist(content)
             await send(.watchlistToggled(true))
           } catch {
-            AppLogger.shared.log("Failed to add to watchlist: \(error)", level: .error)
+            await AppLogger.shared.log("Failed to add to watchlist: \(error)", level: .error)
             await send(.watchlistToggled(false))
           }
         }
@@ -303,7 +305,7 @@ struct ContentDetailFeature {
             try await WatchlistManager.shared.removeFromWatchlist(contentId: contentId)
             await send(.watchlistToggled(false))
           } catch {
-            AppLogger.shared.log("Failed to remove from watchlist: \(error)", level: .error)
+            await AppLogger.shared.log("Failed to remove from watchlist: \(error)", level: .error)
             await send(.watchlistToggled(true))
           }
         }
@@ -327,21 +329,21 @@ struct ContentDetailFeature {
         // Show download selection sheet
         state.showDownloadSheet = true
         return .none
-      
+
       case .episodeDownloadTapped(let episode):
         // Set selected episode and show download sheet
         state.selectedEpisode = episode
         state.showDownloadSheet = true
         return .none
-      
+
       case .downloadSelectionConfirmed(let selection):
         // Dismiss the download sheet
         state.showDownloadSheet = false
-        
+
         // Create download with episode information
         return .run { [clock] send in
           // Create download
-          let download = Download(
+          let download = await Download(
             content: selection.content,
             season: selection.season,
             episode: selection.episode,
@@ -349,43 +351,45 @@ struct ContentDetailFeature {
             quality: selection.quality,
             downloadURL: URL(string: selection.stream.url)
           )
-          
+
           // Add to download queue
           await MainActor.run {
             DownloadQueueManager.shared.addDownload(download, stream: selection.stream)
           }
-          
+
           // Show download started message
           let message: String
           if let episode = selection.episode {
-            message = "Download started: \(selection.content.title) - \(episode.formattedEpisodeId)"
+            message =
+              "Download started: \(selection.content.title) - \(await episode.formattedEpisodeId)"
           } else {
             message = "Download started: \(selection.content.title)"
           }
-          
+
           await send(.showDownloadStartedToast(message))
-          
+
           // Auto-dismiss after 3 seconds
           try await clock.sleep(for: .seconds(3))
           await send(.dismissDownloadToast)
-          
-          AppLogger.shared.log(
-                          "Download queued: \(selection.content.title) - \(selection.episode?.formattedEpisodeId ?? String(localized: "content.type.movie"))",            level: .info
+
+          await AppLogger.shared.log(
+            "Download queued: \(selection.content.title) - \(await selection.episode?.formattedEpisodeId ?? String(localized: "content.type.movie"))",
+            level: .info
           )
         }
-      
+
       case .showDownloadStartedToast(let message):
         // Show the download toast
         state.downloadStartedMessage = message
         state.showDownloadStartedToast = true
         return .none
-      
+
       case .dismissDownloadToast:
         // Dismiss the download toast
         state.showDownloadStartedToast = false
         state.downloadStartedMessage = nil
         return .none
-      
+
       case .dismissDownloadSheet:
         // Dismiss the download sheet
         state.showDownloadSheet = false
@@ -395,7 +399,7 @@ struct ContentDetailFeature {
         // Send delegate action to parent to navigate to similar content
         return .send(.delegate(.navigateToContent(content.id, content.type)))
 
-      case .castMemberTapped(let cast):
+      case .castMemberTapped(_):
         // This is a placeholder for showing cast member details.
         // TODO: Implement cast detail view
         return .none

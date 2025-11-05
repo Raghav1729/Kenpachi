@@ -3,8 +3,8 @@
 // It manages the state and logic for loading and displaying content carousels,
 // including the hero carousel and various content sections.
 
-import ComposableArchitecture // Imports the Composable Architecture library for state management.
-import Foundation // Imports the Foundation framework for basic data types and functionality.
+import ComposableArchitecture  // Imports the Composable Architecture library for state management.
+import Foundation  // Imports the Foundation framework for basic data types and functionality.
 
 /// The `@Reducer` macro transforms the `HomeFeature` struct into a reducer,
 /// which is responsible for handling actions and mutating the state.
@@ -91,13 +91,13 @@ struct HomeFeature {
           do {
             // Fetch watch history entries
             let watchHistory = try await UserRepository.shared.fetchWatchHistory()
-            let recentEntries = watchHistory.recentEntries(limit: 20)
+            let recentEntries = await watchHistory.recentEntries(limit: 20)
             await send(.watchHistoryLoaded(recentEntries))
           } catch {
-            AppLogger.shared.log("Failed to load watch history: \(error)", level: .warning)
+            await AppLogger.shared.log("Failed to load watch history: \(error)", level: .warning)
           }
         }
-        
+
         // If the content carousels are empty, also load content.
         if state.contentCarousels.isEmpty {
           return .merge(
@@ -120,7 +120,7 @@ struct HomeFeature {
         return .run { send in
           do {
             // Create an instance of the `ContentRepository`.
-            let contentRepository = ContentRepository()
+            let contentRepository = await ContentRepository()
 
             // Fetch the home content using the repository.
             let carousels = try await contentRepository.fetchHomeContent()
@@ -149,7 +149,7 @@ struct HomeFeature {
 
             // Fetch watch history entries
             let watchHistory = try await UserRepository.shared.fetchWatchHistory()
-            let recentEntries = watchHistory.recentEntries(limit: 20)
+            let recentEntries = await watchHistory.recentEntries(limit: 20)
             await send(.watchHistoryLoaded(recentEntries))
 
             // Get the items from the hero carousel.
@@ -163,7 +163,8 @@ struct HomeFeature {
             }
           } catch {
             // If an error occurs, log a warning message.
-            AppLogger.shared.log("Failed to load watchlist or watch history: \(error)", level: .warning)
+            await AppLogger.shared.log(
+              "Failed to load watchlist or watch history: \(error)", level: .warning)
           }
         }
 
@@ -179,7 +180,7 @@ struct HomeFeature {
         state.currentHeroIndex = index
         return .none
 
-      case .contentTapped(let content):
+      case .contentTapped(_):
         // This is a placeholder for handling content taps, which should navigate to a detail screen.
         // TODO: Implement navigation to detail screen
         return .none
@@ -197,7 +198,7 @@ struct HomeFeature {
         return .run { send in
           do {
             // Create an instance of the `ContentRepository`.
-            let contentRepository = ContentRepository()
+            let contentRepository = await ContentRepository()
 
             // If the content is a TV show, get the first episode of the first season.
             var episodeId: String?
@@ -268,7 +269,7 @@ struct HomeFeature {
             await send(.watchlistLoaded(watchlistContent))
           } catch {
             // If an error occurs, log an error message.
-            AppLogger.shared.log("Failed to toggle watchlist: \(error)", level: .error)
+            await AppLogger.shared.log("Failed to toggle watchlist: \(error)", level: .error)
             // Revert the UI to the original status.
             await send(.watchlistToggled(content.id, currentStatus))
           }
@@ -314,14 +315,14 @@ struct HomeFeature {
         // Fetch the content using the contentId from the entry
         return .run { send in
           do {
-            let contentRepository = ContentRepository()
+            let contentRepository = await ContentRepository()
             let content = try await contentRepository.fetchContentDetails(
               id: entry.contentId,
               type: nil
             )
             await send(.contentTapped(content))
           } catch {
-            AppLogger.shared.log(
+            await AppLogger.shared.log(
               "Failed to fetch content for history entry: \(error)",
               level: .error
             )

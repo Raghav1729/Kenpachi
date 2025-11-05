@@ -7,6 +7,19 @@ import Foundation
 
 @Reducer
 struct DownloadsFeature {
+  
+  /// Helper function to get total device storage
+  private func getTotalDeviceStorage() -> Int64 {
+    do {
+      let fileURL = URL(fileURLWithPath: NSHomeDirectory())
+      let values = try fileURL.resourceValues(forKeys: [
+        .volumeTotalCapacityKey
+      ])
+      return Int64(values.volumeTotalCapacity ?? 0)
+    } catch {
+      return 0
+    }
+  }
 
   @ObservableState
   struct State: Equatable {
@@ -18,7 +31,7 @@ struct DownloadsFeature {
     var errorMessage: String?
     /// Total storage used
     var storageUsed: Int64 = 0
-    /// Available storage
+    /// Available storage (total device storage)
     var storageAvailable: Int64 = 0
     /// Show delete confirmation
     var showDeleteConfirmation = false
@@ -30,6 +43,12 @@ struct DownloadsFeature {
     var showPlayer = false
     /// Download to play
     var downloadToPlay: Download?
+    /// Show offline player
+    var showOfflinePlayer = false
+    /// Download to play offline
+    var offlineDownloadToPlay: Download?
+    /// Downloads being converted (downloadId -> progress)
+    var convertingDownloads: [String: Double] = [:]
   }
 
   enum Action: Equatable {
@@ -49,6 +68,10 @@ struct DownloadsFeature {
     case downloadTapped(Download)
     /// Dismiss player
     case dismissPlayer
+    /// Show offline player
+    case showOfflinePlayer(Download)
+    /// Dismiss offline player
+    case dismissOfflinePlayer
     /// Delete download tapped
     case deleteDownloadTapped(Download)
     /// Confirm delete
@@ -67,6 +90,14 @@ struct DownloadsFeature {
     case storageInfoTapped
     /// Dismiss storage info
     case dismissStorageInfo
+    /// Convert HLS to MP4
+    case convertToMP4(Download)
+    /// Conversion progress updated
+    case conversionProgress(String, Double)
+    /// Conversion completed successfully
+    case conversionSuccess(String, URL)
+    /// Conversion failed
+    case conversionFailure(String, String)
     /// Error occurred
     case errorOccurred(String)
   }
@@ -81,7 +112,7 @@ struct DownloadsFeature {
         return .merge(
           .send(.refresh),
           .run { send in
-            for await _ in clock.timer(interval: .seconds(5)) {
+            for await _ in await clock.timer(interval: .seconds(5)) {
               await send(.autoRefreshTick)
             }
           }
@@ -94,31 +125,27 @@ struct DownloadsFeature {
 
       case .autoRefreshTick:
         /// Auto-refresh downloads without showing loading state
-        return .run { send in
+        return .run { [self] send in
           await MainActor.run {
             let manager = DownloadQueueManager.shared
+            
+            // Ensure manager is initialized
+            manager.initialize()
+            
+            // Debug logging
+            manager.debugDownloadCounts()
+            
             let allDownloads =
               manager.activeDownloads + manager.queuedDownloads + manager.completedDownloads
               + manager.failedDownloads
+            
+            AppLogger.shared.log("Loading \(allDownloads.count) downloads in DownloadsFeature", level: .debug)
             send(.downloadsLoaded(allDownloads))
 
-            /// Calculate storage
-            let usedStorage = allDownloads.reduce(Int64(0)) { $0 + ($1.fileSize ?? 0) }
-            let availableStorage = getAvailableStorage()
-            send(.storageInfoUpdated(used: usedStorage, available: availableStorage))
-          }
-        }
-
-        /// Helper function to get available storage
-        func getAvailableStorage() -> Int64 {
-          do {
-            let fileURL = URL(fileURLWithPath: NSHomeDirectory())
-            let values = try fileURL.resourceValues(forKeys: [
-              .volumeAvailableCapacityForImportantUsageKey
-            ])
-            return Int64(values.volumeAvailableCapacityForImportantUsage ?? 0)
-          } catch {
-            return 0
+            /// Calculate actual storage usage from file system
+            let usedStorage = FileManager.getTotalDownloadsSize()
+            let totalStorage = self.getTotalDeviceStorage()
+            send(.storageInfoUpdated(used: usedStorage, available: totalStorage))
           }
         }
 
@@ -127,32 +154,28 @@ struct DownloadsFeature {
         state.isLoading = true
         state.errorMessage = nil
 
-        return .run { send in
+        return .run { [self] send in
           /// Fetch downloads from DownloadQueueManager
           await MainActor.run {
             let manager = DownloadQueueManager.shared
+            
+            // Ensure manager is initialized
+            manager.initialize()
+            
+            // Debug logging
+            manager.debugDownloadCounts()
+            
             let allDownloads =
               manager.activeDownloads + manager.queuedDownloads + manager.completedDownloads
               + manager.failedDownloads
+            
+            AppLogger.shared.log("Refreshing \(allDownloads.count) downloads in DownloadsFeature", level: .debug)
             send(.downloadsLoaded(allDownloads))
 
-            /// Calculate storage
-            let usedStorage = allDownloads.reduce(Int64(0)) { $0 + ($1.fileSize ?? 0) }
-            let availableStorage = getAvailableStorage()
-            send(.storageInfoUpdated(used: usedStorage, available: availableStorage))
-          }
-        }
-
-        /// Helper function to get available storage
-        func getAvailableStorage() -> Int64 {
-          do {
-            let fileURL = URL(fileURLWithPath: NSHomeDirectory())
-            let values = try fileURL.resourceValues(forKeys: [
-              .volumeAvailableCapacityForImportantUsageKey
-            ])
-            return Int64(values.volumeAvailableCapacityForImportantUsage ?? 0)
-          } catch {
-            return 0
+            /// Calculate actual storage usage from file system
+            let usedStorage = FileManager.getTotalDownloadsSize()
+            let totalStorage = self.getTotalDeviceStorage()
+            send(.storageInfoUpdated(used: usedStorage, available: totalStorage))
           }
         }
 
@@ -172,15 +195,28 @@ struct DownloadsFeature {
         /// Handle download tap (play downloaded content)
         // Only play if download is completed
         guard download.state == .completed else { return .none }
-        
-        state.downloadToPlay = download
-        state.showPlayer = true
+
+        // Use offline player for local files
+        state.offlineDownloadToPlay = download
+        state.showOfflinePlayer = true
         return .none
-      
+
       case .dismissPlayer:
         /// Dismiss player
         state.showPlayer = false
         state.downloadToPlay = nil
+        return .none
+
+      case .showOfflinePlayer(let download):
+        /// Show offline player
+        state.offlineDownloadToPlay = download
+        state.showOfflinePlayer = true
+        return .none
+
+      case .dismissOfflinePlayer:
+        /// Dismiss offline player
+        state.showOfflinePlayer = false
+        state.offlineDownloadToPlay = nil
         return .none
 
       case .deleteDownloadTapped(let download):
@@ -248,6 +284,57 @@ struct DownloadsFeature {
         /// Dismiss storage info
         state.showStorageInfo = false
         return .none
+
+      case .convertToMP4(let download):
+        /// Convert HLS download to MP4
+        guard let localFilePath = download.localFilePath,
+              FileManager.isHLSPackage(at: localFilePath) else {
+          return .send(.errorOccurred("File is not an HLS package"))
+        }
+        
+        state.convertingDownloads[download.id] = 0.0
+        
+        return .run { send in
+          do {
+            let mp4URL = try await FileManager.convertHLSToMP4(
+              movpkgURL: localFilePath,
+              deleteOriginal: true,
+              progress: { progress in
+                Task { @MainActor in
+                  send(.conversionProgress(download.id, progress))
+                }
+              }
+            )
+            await send(.conversionSuccess(download.id, mp4URL))
+          } catch {
+            await send(.conversionFailure(download.id, error.localizedDescription))
+          }
+        }
+
+      case .conversionProgress(let downloadId, let progress):
+        /// Update conversion progress
+        state.convertingDownloads[downloadId] = progress
+        return .none
+
+      case .conversionSuccess(let downloadId, let mp4URL):
+        /// Handle successful conversion
+        state.convertingDownloads.removeValue(forKey: downloadId)
+        
+        // Update the download's local file path to point to the MP4
+        if let index = state.downloads.firstIndex(where: { $0.id == downloadId }) {
+          var updatedDownload = state.downloads[index]
+          updatedDownload.localFilePath = mp4URL
+          state.downloads[index] = updatedDownload
+          
+          // Update in DownloadQueueManager as well
+          DownloadQueueManager.shared.updateDownloadFilePath(downloadId, newPath: mp4URL)
+        }
+        return .send(.refresh)
+
+      case .conversionFailure(let downloadId, let errorMessage):
+        /// Handle conversion failure
+        state.convertingDownloads.removeValue(forKey: downloadId)
+        return .send(.errorOccurred("Conversion failed: \(errorMessage)"))
 
       case .errorOccurred(let message):
         /// Handle error

@@ -4,8 +4,8 @@
 
 import ComposableArchitecture
 import Foundation
-import UIKit
 import SwiftUI
+import UIKit
 
 @Reducer
 struct MySpaceFeature {
@@ -107,7 +107,7 @@ struct MySpaceFeature {
 
             /// Fetch watch history entries
             let watchHistory = try await UserRepository.shared.fetchWatchHistory()
-            let allEntries = watchHistory.recentEntries(limit: 20)
+            let allEntries = await watchHistory.recentEntries(limit: 20)
             await send(.watchHistoryLoaded(allEntries))
 
             /// Fetch statistics

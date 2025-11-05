@@ -104,6 +104,8 @@ final class BiometricAuthService {
         biometricType = .touchID
       case .none:
         biometricType = .none
+      case .opticID:
+        biometricType = .none
       @unknown default:
         biometricType = .none
       }

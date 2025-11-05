@@ -239,7 +239,7 @@ struct SettingsFeature {
         state.imageCacheSize = storageInfo.imageCacheSize
         state.downloadsSize = storageInfo.downloadsSize
         return .none
-      
+
       case .storageInfoUpdated(let storageInfo):
         /// Update storage info
         state.totalStorageUsed = storageInfo.totalUsed
@@ -251,7 +251,7 @@ struct SettingsFeature {
       case .themeChanged(let theme):
         state.selectedTheme = theme
         return .run { _ in
-          userDefaults.set(theme.rawValue, forKey: UserDefaultsKeys.selectedTheme)
+          await userDefaults.set(theme.rawValue, forKey: UserDefaultsKeys.selectedTheme)
           /// Apply theme immediately
           await MainActor.run {
             ThemeManager.shared.setThemeFromMode(theme)
@@ -261,25 +261,26 @@ struct SettingsFeature {
       case .accentColorChanged(let color):
         state.accentColor = color
         return .run { _ in
-          userDefaults.set(color.rawValue, forKey: UserDefaultsKeys.accentColor)
+          await userDefaults.set(color.rawValue, forKey: UserDefaultsKeys.accentColor)
         }
 
       case .biometricAuthToggled(let enabled):
         state.biometricAuthEnabled = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.biometricAuthEnabled)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.biometricAuthEnabled)
         }
 
       case .autoLockTimeoutChanged(let timeout):
         state.autoLockTimeout = timeout
         return .run { _ in
-          userDefaults.set(timeout.rawValue, forKey: UserDefaultsKeys.autoLockTimeout)
+          await userDefaults.set(timeout.rawValue, forKey: UserDefaultsKeys.autoLockTimeout)
         }
 
       case .scraperSourceChanged(let source):
         state.defaultScraperSource = source
         return .run { send in
-          userDefaults.set(source.rawValue, forKey: UserDefaultsKeys.defaultScraperSource)
+          await userDefaults.set(
+            source.rawValue, forKey: UserDefaultsKeys.defaultScraperSource)
           /// Apply scraper source immediately
           await MainActor.run {
             let scraperName = source.displayName
@@ -292,151 +293,153 @@ struct SettingsFeature {
       case .preferredLanguageChanged(let language):
         state.preferredLanguage = language
         return .run { _ in
-          userDefaults.set(language.rawValue, forKey: UserDefaultsKeys.preferredContentLanguage)
+          await userDefaults.set(
+            language.rawValue, forKey: UserDefaultsKeys.preferredContentLanguage)
         }
 
       case .showAdultContentToggled(let enabled):
         state.showAdultContent = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.showAdultContent)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.showAdultContent)
         }
 
       case .parentalControlsToggled(let enabled):
         state.parentalControlsEnabled = enabled
         return .run { _ in
-            userDefaults.set(enabled, forKey: UserDefaultsKeys.parentalControlsEnabled)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.parentalControlsEnabled)
         }
 
       case .allowedContentRatingChanged(let rating):
         state.allowedContentRating = rating
         return .run { _ in
-            userDefaults.set(rating.rawValue, forKey: UserDefaultsKeys.allowedContentRating)
+          await userDefaults.set(rating.rawValue, forKey: UserDefaultsKeys.allowedContentRating)
         }
 
       case .autoPlayToggled(let enabled):
         state.autoPlayEnabled = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.autoPlayEnabled)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.autoPlayEnabled)
         }
 
       case .autoPlayTrailersToggled(let enabled):
         state.autoPlayTrailers = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.autoPlayTrailers)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.autoPlayTrailers)
         }
 
       case .defaultQualityChanged(let quality):
         state.defaultQuality = quality
         return .run { _ in
-          userDefaults.set(quality.rawValue, forKey: UserDefaultsKeys.defaultPlaybackQuality)
+          await userDefaults.set(quality.rawValue, forKey: UserDefaultsKeys.defaultPlaybackQuality)
         }
 
       case .subtitlesToggled(let enabled):
         state.subtitlesEnabled = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.subtitlesEnabled)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.subtitlesEnabled)
         }
 
       case .subtitleLanguageChanged(let language):
         state.preferredSubtitleLanguage = language
         return .run { _ in
-          userDefaults.set(language.rawValue, forKey: UserDefaultsKeys.preferredSubtitleLanguage)
+          await userDefaults.set(
+            language.rawValue, forKey: UserDefaultsKeys.preferredSubtitleLanguage)
         }
 
       case .audioLanguageChanged(let language):
         state.preferredAudioLanguage = language
         return .run { _ in
-          userDefaults.set(language.rawValue, forKey: UserDefaultsKeys.preferredAudioLanguage)
+          await userDefaults.set(language.rawValue, forKey: UserDefaultsKeys.preferredAudioLanguage)
         }
 
       case .playbackSpeedChanged(let speed):
         state.playbackSpeed = speed
         return .run { _ in
-          userDefaults.set(speed.rawValue, forKey: UserDefaultsKeys.defaultPlaybackSpeed)
+          await userDefaults.set(speed.rawValue, forKey: UserDefaultsKeys.defaultPlaybackSpeed)
         }
 
       case .downloadQualityChanged(let quality):
         state.downloadQuality = quality
         return .run { _ in
-          userDefaults.set(quality.rawValue, forKey: UserDefaultsKeys.downloadQuality)
+          await userDefaults.set(quality.rawValue, forKey: UserDefaultsKeys.downloadQuality)
         }
 
       case .downloadOverCellularToggled(let enabled):
         state.downloadOverCellular = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.downloadOverCellular)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.downloadOverCellular)
         }
 
       case .autoDeleteWatchedToggled(let enabled):
         state.autoDeleteWatchedDownloads = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.autoDeleteWatchedDownloads)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.autoDeleteWatchedDownloads)
         }
 
       case .pushNotificationsToggled(let enabled):
         state.pushNotificationsEnabled = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.pushNotificationsEnabled)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.pushNotificationsEnabled)
         }
 
       case .newContentNotificationsToggled(let enabled):
         state.newContentNotifications = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.newContentNotifications)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.newContentNotifications)
         }
 
       case .downloadNotificationsToggled(let enabled):
         state.downloadCompleteNotifications = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.downloadCompleteNotifications)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.downloadCompleteNotifications)
         }
 
       case .recommendationNotificationsToggled(let enabled):
         state.recommendationNotifications = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.recommendationNotifications)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.recommendationNotifications)
         }
 
       case .airPlayToggled(let enabled):
         state.airPlayEnabled = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.airPlayEnabled)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.airPlayEnabled)
         }
 
       case .chromecastToggled(let enabled):
         state.chromecastEnabled = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.chromecastEnabled)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.chromecastEnabled)
         }
 
       case .pipToggled(let enabled):
         state.pipEnabled = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.pipEnabled)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.pipEnabled)
         }
 
       case .analyticsToggled(let enabled):
         state.analyticsEnabled = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.analyticsEnabled)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.analyticsEnabled)
         }
 
       case .crashReportingToggled(let enabled):
         state.crashReportingEnabled = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.crashReportingEnabled)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.crashReportingEnabled)
         }
 
       case .personalizedRecommendationsToggled(let enabled):
         state.personalizedRecommendations = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.personalizedRecommendations)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.personalizedRecommendations)
         }
 
       case .searchHistoryToggled(let enabled):
         state.searchHistoryEnabled = enabled
         return .run { _ in
-          userDefaults.set(enabled, forKey: UserDefaultsKeys.searchHistoryEnabled)
+          await userDefaults.set(enabled, forKey: UserDefaultsKeys.searchHistoryEnabled)
         }
 
       case .clearCacheTapped:
@@ -466,16 +469,16 @@ struct SettingsFeature {
             Task {
               await ContentCache.shared.clearAllCaches()
             }
-            
+
             // Clear general cache manager
             CacheManager.shared.clearAllCaches()
-            
+
             // Clear URL cache
             URLCache.shared.removeAllCachedResponses()
-            
+
             print("✅ [Settings] All caches cleared successfully")
           }
-          
+
           // Get updated cache size
           let newCacheSize = await getCacheSize()
           await send(.cacheCleared(newCacheSize))
@@ -488,7 +491,7 @@ struct SettingsFeature {
         state.totalStorageUsed -= clearedAmount
         print("✅ [Settings] Cache cleared: \(formatBytes(clearedAmount))")
         return .none
-      
+
       case .clearImageCacheTapped:
         state.alert = AlertState {
           TextState("settings.image_cache.clear_alert_title")
@@ -503,10 +506,10 @@ struct SettingsFeature {
           TextState("settings.image_cache.clear_alert_message")
         }
         return .none
-      
+
       case .alert(.presented(.confirmClearImageCache)):
         return .send(.clearImageCacheConfirmed)
-      
+
       case .clearImageCacheConfirmed:
         state.isClearingImageCache = true
         return .run { send in
@@ -515,12 +518,12 @@ struct SettingsFeature {
             ImageCache.shared.clearAllImageCaches()
             print("✅ [Settings] Image cache cleared successfully")
           }
-          
+
           // Get updated cache size
           let newImageCacheSize = await getImageCacheSize()
           await send(.imageCacheCleared(newImageCacheSize))
         }
-      
+
       case .imageCacheCleared(let newSize):
         state.isClearingImageCache = false
         let clearedAmount = state.imageCacheSize - newSize
@@ -531,7 +534,7 @@ struct SettingsFeature {
 
       case .clearSearchHistoryTapped:
         return .run { send in
-          userDefaults.removeObject(forKey: UserDefaultsKeys.recentSearches)
+          await userDefaults.removeObject(forKey: UserDefaultsKeys.recentSearches)
           await send(.searchHistoryCleared)
         }
 
@@ -597,7 +600,9 @@ struct SettingsFeature {
           ?? "english") ?? .english,
       showAdultContent: userDefaults.bool(forKey: UserDefaultsKeys.showAdultContent),
       parentalControlsEnabled: userDefaults.bool(forKey: UserDefaultsKeys.parentalControlsEnabled),
-      allowedContentRating: ContentRating(rawValue: userDefaults.string(forKey: UserDefaultsKeys.allowedContentRating) ?? "unrestricted") ?? .unrestricted,
+      allowedContentRating: ContentRating(
+        rawValue: userDefaults.string(forKey: UserDefaultsKeys.allowedContentRating)
+          ?? "unrestricted") ?? .unrestricted,
       autoPlayEnabled: userDefaults.bool(forKey: UserDefaultsKeys.autoPlayEnabled),
       autoPlayTrailers: userDefaults.bool(forKey: UserDefaultsKeys.autoPlayTrailers),
       defaultQuality: VideoQuality(
@@ -649,31 +654,31 @@ struct SettingsFeature {
       downloadsSize: downloadsSize
     )
   }
-  
+
   /// Get current cache size
   private func getCacheSize() async -> Int64 {
     return await MainActor.run {
       var totalSize: Int64 = 0
-      
+
       // Get CacheManager sizes
       totalSize += Int64(CacheManager.shared.currentMemorySize)
       totalSize += Int64(CacheManager.shared.currentDiskSize)
-      
+
       // Get URLCache size
       totalSize += Int64(URLCache.shared.currentDiskUsage)
       totalSize += Int64(URLCache.shared.currentMemoryUsage)
-      
+
       return totalSize
     }
   }
-  
+
   /// Get current image cache size
   private func getImageCacheSize() async -> Int64 {
     return await MainActor.run {
       ImageCache.shared.getCacheSize()
     }
   }
-  
+
   /// Format bytes to human-readable string
   private func formatBytes(_ bytes: Int64) -> String {
     let formatter = ByteCountFormatter()
@@ -693,19 +698,19 @@ enum BiometricType: String, Equatable {
 
 /// Content rating for parental controls
 enum ContentRating: String, CaseIterable, Equatable, Codable {
-    case unrestricted
-    case pg13
-    case pg
-    case g
-    
-    var displayName: String {
-        switch self {
-        case .unrestricted: return "Unrestricted"
-        case .pg13: return "PG-13"
-        case .pg: return "PG"
-        case .g: return "G"
-        }
+  case unrestricted
+  case pg13
+  case pg
+  case g
+
+  var displayName: String {
+    switch self {
+    case .unrestricted: return "Unrestricted"
+    case .pg13: return "PG-13"
+    case .pg: return "PG"
+    case .g: return "G"
     }
+  }
 }
 
 /// Storage information model

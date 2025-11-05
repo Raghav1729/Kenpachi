@@ -17,12 +17,12 @@ struct ContentProgressCard: View {
   var showTitle: Bool = true
   /// Optional remove button callback
   var onRemove: (() -> Void)?
-  
+
   /// Computed height based on 16:9 aspect ratio
   private var height: CGFloat {
     width * 9 / 16
   }
-  
+
   /// Formatted time remaining
   private var timeRemaining: String {
     let remaining = entry.duration - entry.currentTime
@@ -35,7 +35,7 @@ struct ContentProgressCard: View {
       return "\(hours)h \(remainingMinutes)m left"
     }
   }
-  
+
   var body: some View {
     Button(action: onTapped) {
       VStack(alignment: .leading, spacing: 8) {
@@ -71,14 +71,14 @@ struct ContentProgressCard: View {
                   Image(systemName: "film")
                     .font(.title)
                     .foregroundColor(.textTertiary)
-                  Text(entry.title ?? entry.contentId)
+                  Text(entry.title)
                     .font(.captionMedium)
                     .foregroundColor(.textSecondary)
                     .lineLimit(1)
                 }
               )
           }
-          
+
           /// Remove button overlay (top-right)
           if let onRemove = onRemove {
             Button(action: onRemove) {
@@ -94,7 +94,7 @@ struct ContentProgressCard: View {
             .padding(8)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
           }
-          
+
           /// Progress bar at the bottom
           if entry.progress > 0 {
             GeometryReader { geometry in
@@ -103,7 +103,7 @@ struct ContentProgressCard: View {
                 Rectangle()
                   .fill(Color.primary)
                   .frame(width: geometry.size.width * CGFloat(entry.progress))
-                
+
                 /// Unwatched portion
                 Rectangle()
                   .fill(Color.white.opacity(0.3))
@@ -114,32 +114,34 @@ struct ContentProgressCard: View {
           }
         }
         .frame(width: width, height: height)
-        
+
         /// Title and info below card
         if showTitle {
           VStack(alignment: .leading, spacing: 4) {
             /// Content title
-            Text(entry.title ?? entry.contentId) // Will be updated when content is fetched
+            Text(entry.title)  // Will be updated when content is fetched
               .font(.labelMedium)
               .foregroundColor(.textPrimary)
               .lineLimit(1)
-            
+
             /// Episode info and progress
             HStack(spacing: 8) {
               if let seasonNumber = entry.seasonNumber, let episodeNumber = entry.episodeNumber {
-                Text("S\(String(format: "%02d", seasonNumber))E\(String(format: "%02d", episodeNumber))")
-                  .font(.captionMedium)
-                  .foregroundColor(.textSecondary)
+                Text(
+                  "S\(String(format: "%02d", seasonNumber))E\(String(format: "%02d", episodeNumber))"
+                )
+                .font(.captionMedium)
+                .foregroundColor(.textSecondary)
               } else if let episodeId = entry.episodeId {
                 Text(episodeId)
                   .font(.captionMedium)
                   .foregroundColor(.textSecondary)
               }
-              
+
               Text(entry.formattedProgress)
                 .font(.captionMedium)
                 .foregroundColor(.textSecondary)
-              
+
               if entry.duration > 0 {
                 Text("• \(timeRemaining)")
                   .font(.captionMedium)
@@ -168,7 +170,7 @@ extension View {
 struct RoundedCorner: Shape {
   var radius: CGFloat = .infinity
   var corners: UIRectCorner = .allCorners
-  
+
   func path(in rect: CGRect) -> Path {
     let path = UIBezierPath(
       roundedRect: rect,
@@ -195,7 +197,7 @@ struct RoundedCorner: Shape {
         onTapped: {},
         onRemove: {}
       )
-      
+
       ContentProgressCard(
         entry: WatchHistoryEntry(
           contentId: "show-2",
@@ -212,7 +214,7 @@ struct RoundedCorner: Shape {
         onTapped: {},
         onRemove: {}
       )
-      
+
       ContentProgressCard(
         entry: WatchHistoryEntry(
           contentId: "movie-3",
@@ -225,7 +227,7 @@ struct RoundedCorner: Shape {
         ),
         onTapped: {}
       )
-      
+
       ContentProgressCard(
         entry: WatchHistoryEntry(
           contentId: "show-4",

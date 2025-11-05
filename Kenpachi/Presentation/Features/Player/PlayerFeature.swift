@@ -82,16 +82,16 @@ struct PlayerFeature {
       self.selectedLink = streamingLinks.first
       self.availableQualities = Array(Set(streamingLinks.compactMap { $0.quality })).sorted()
       self.selectedQuality = streamingLinks.first?.quality
-      
+
       // Initialize PiP as supported by default (will be updated by the service)
       self.isPiPSupported = true
-      
+
       // Add sample subtitles for testing
       self.availableSubtitles = [
         Subtitle(id: "none", name: "None", language: "none", url: ""),
         Subtitle(id: "en", name: "English", language: "en", url: ""),
         Subtitle(id: "es", name: "Spanish", language: "es", url: ""),
-        Subtitle(id: "fr", name: "French", language: "fr", url: "")
+        Subtitle(id: "fr", name: "French", language: "fr", url: ""),
       ]
       self.selectedSubtitle = Subtitle.none
     }
@@ -163,7 +163,7 @@ struct PlayerFeature {
         let season = state.season
         let currentTime = state.currentTime
         let duration = state.duration
-        
+
         return .run { _ in
           do {
             try await WatchHistoryManager.shared.updateWatchHistory(
@@ -174,7 +174,7 @@ struct PlayerFeature {
               duration: duration
             )
           } catch {
-            AppLogger.shared.log("Failed to update watch history: \(error)", level: .warning)
+            await AppLogger.shared.log("Failed to update watch history: \(error)", level: .warning)
           }
         }
 
@@ -286,7 +286,7 @@ struct PlayerFeature {
           let season = state.season
           let currentTime = state.currentTime
           let duration = state.duration
-          
+
           return .run { _ in
             do {
               try await WatchHistoryManager.shared.updateWatchHistory(
@@ -297,7 +297,8 @@ struct PlayerFeature {
                 duration: duration
               )
             } catch {
-              AppLogger.shared.log("Failed to update watch history: \(error)", level: .warning)
+              await AppLogger.shared.log(
+                "Failed to update watch history: \(error)", level: .warning)
             }
           }
         }

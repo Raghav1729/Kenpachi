@@ -194,39 +194,8 @@ final class AVDownloaderService: NSObject {
   /// Gets the downloads directory (accessible in Files app)
   /// - Returns: URL to downloads directory
   private func getDownloadDirectory() -> URL? {
-    let fileManager = FileManager.default
-
-    // Use Documents directory which is accessible in Files app
-    guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
-    else {
-      return nil
-    }
-
-    // Create Downloads subdirectory
-    let downloadsURL = documentsURL.appendingPathComponent("Downloads", isDirectory: true)
-
-    // Create directory if it doesn't exist
-    if !fileManager.fileExists(atPath: downloadsURL.path) {
-      do {
-        try fileManager.createDirectory(
-          at: downloadsURL, withIntermediateDirectories: true, attributes: nil)
-
-        // Exclude from iCloud backup to keep it local only
-        var resourceValues = URLResourceValues()
-        resourceValues.isExcludedFromBackup = true
-        var mutableURL = downloadsURL
-        try mutableURL.setResourceValues(resourceValues)
-
-        AppLogger.shared.log(
-          "Downloads directory created at: \(downloadsURL.path)", level: .info)
-      } catch {
-        AppLogger.shared.log(
-          "Failed to create downloads directory: \(error)", level: .error)
-        return nil
-      }
-    }
-
-    return downloadsURL
+    // Use the centralized FileManager extension method
+    return FileManager.getKenpachiDownloadsDirectory()
   }
 
   /// Generates a descriptive filename for the download
@@ -334,6 +303,16 @@ extension AVDownloaderService: URLSessionDownloadDelegate {
 
       // Move downloaded file
       try FileManager.default.moveItem(at: location, to: destinationURL)
+      
+      // Log the exact file path for debugging
+      AppLogger.shared.log("File saved to: \(destinationURL.path)", level: .info)
+      AppLogger.shared.log("File exists: \(FileManager.default.fileExists(atPath: destinationURL.path))", level: .info)
+      
+      // Verify file is readable
+      if let attributes = try? FileManager.default.attributesOfItem(atPath: destinationURL.path),
+         let fileSize = attributes[.size] as? Int64 {
+        AppLogger.shared.log("File size: \(fileSize) bytes", level: .info)
+      }
 
       // Call completion callback
       completionCallbacks[downloadId]?(.success(destinationURL))
@@ -343,7 +322,7 @@ extension AVDownloaderService: URLSessionDownloadDelegate {
       progressCallbacks.removeValue(forKey: downloadId)
       completionCallbacks.removeValue(forKey: downloadId)
 
-      AppLogger.shared.log("Download completed: \(downloadId)", level: .info)
+      AppLogger.shared.log("Download completed: \(downloadId) at \(destinationURL.lastPathComponent)", level: .info)
     } catch {
       completionCallbacks[downloadId]?(.failure(error))
       AppLogger.shared.log("Download file move failed: \(error)", level: .error)
@@ -381,17 +360,53 @@ extension AVDownloaderService: AVAssetDownloadDelegate {
       return
     }
 
-    // HLS downloads are already in a playable format
-    // No need to convert - just use the downloaded asset location
-    AppLogger.shared.log("HLS download completed: \(location.path)", level: .info)
+    AppLogger.shared.log("HLS download completed at system location: \(location.path)", level: .info)
 
-    // Call completion callback with the asset location
-    completionCallbacks[downloadId]?(.success(location))
+    // Move HLS asset to user-accessible Downloads directory
+    guard let downloadsURL = getDownloadDirectory() else {
+      completionCallbacks[downloadId]?(.failure(DownloadError.fileSystemError))
+      return
+    }
 
-    // Cleanup
-    activeAssetTasks.removeValue(forKey: downloadId)
-    progressCallbacks.removeValue(forKey: downloadId)
-    completionCallbacks.removeValue(forKey: downloadId)
+    // Generate filename with metadata
+    let fileName = generateFileName(downloadId: downloadId, fileExtension: "movpkg")
+    let movpkgURL = downloadsURL.appendingPathComponent(fileName)
+
+    do {
+      // Remove existing file if present
+      if FileManager.default.fileExists(atPath: movpkgURL.path) {
+        try FileManager.default.removeItem(at: movpkgURL)
+      }
+
+      // Move the .movpkg directory to Downloads folder
+      try FileManager.default.moveItem(at: location, to: movpkgURL)
+
+      AppLogger.shared.log("HLS file moved to: \(movpkgURL.path)", level: .info)
+      AppLogger.shared.log("File exists: \(FileManager.default.fileExists(atPath: movpkgURL.path))", level: .info)
+
+      // Verify file/directory is readable
+      if let attributes = try? FileManager.default.attributesOfItem(atPath: movpkgURL.path),
+         let fileSize = attributes[.size] as? Int64 {
+        AppLogger.shared.log("File size: \(fileSize) bytes", level: .info)
+      }
+
+      // Call completion callback with the movpkg location
+      // Note: Automatic conversion is disabled due to AVFoundation limitations
+      // Users can manually convert .movpkg files to MP4 from Settings > HLS Converter
+      completionCallbacks[downloadId]?(.success(movpkgURL))
+
+      // Cleanup
+      activeAssetTasks.removeValue(forKey: downloadId)
+      progressCallbacks.removeValue(forKey: downloadId)
+      completionCallbacks.removeValue(forKey: downloadId)
+
+      AppLogger.shared.log("HLS download completed: \(downloadId) at \(movpkgURL.lastPathComponent)", level: .info)
+      AppLogger.shared.log("Note: Use Settings > HLS Converter to convert .movpkg to MP4", level: .info)
+
+    } catch {
+      completionCallbacks[downloadId]?(.failure(error))
+      AppLogger.shared.log("HLS file move failed: \(error)", level: .error)
+    }
   }
 
   /// Called periodically to report asset download progress

@@ -5,53 +5,47 @@
 import ComposableArchitecture
 import SwiftUI
 
+/// Downloads tab options
+enum DownloadsTab: CaseIterable {
+  case downloads
+  case offline
+  
+  var title: String {
+    switch self {
+    case .downloads: return "Downloads"
+    case .offline: return "Offline Library"
+    }
+  }
+  
+  var icon: String {
+    switch self {
+    case .downloads: return "arrow.down.circle"
+    case .offline: return "folder"
+    }
+  }
+}
+
 struct DownloadsView: View {
   let store: StoreOf<DownloadsFeature>
+  
+  @State private var selectedTab: DownloadsTab = .downloads
 
   var body: some View {
     WithViewStore(store, observe: { $0 }) { viewStore in
       NavigationStack {
-        ZStack {
-          Color.appBackground.ignoresSafeArea()
-
-          if viewStore.isLoading {
-            LoadingView()
-          } else if viewStore.downloads.isEmpty {
-            EmptyDownloadsView()
-          } else {
-            ScrollView {
-              VStack(alignment: .leading, spacing: .spacingM) {
-                // Storage bar at top
-                StorageBar(
-                  used: viewStore.storageUsed,
-                  available: viewStore.storageAvailable
-                )
-                .padding(.horizontal, .spacingM)
-                .padding(.top, .spacingXS)
-
-                // Compact downloads grid
-                LazyVGrid(
-                  columns: [
-                    GridItem(.flexible(), spacing: .spacingS),
-                    GridItem(.flexible(), spacing: .spacingS),
-                    GridItem(.flexible(), spacing: .spacingS)
-                  ],
-                  spacing: .spacingM
-                ) {
-                  ForEach(viewStore.downloads) { download in
-                    DownloadCard(
-                      download: download,
-                      onTap: { viewStore.send(.downloadTapped(download)) },
-                      onDelete: { viewStore.send(.deleteDownloadTapped(download)) },
-                      onPause: { viewStore.send(.pauseDownload(download.id)) },
-                      onResume: { viewStore.send(.resumeDownload(download.id)) },
-                      onCancel: { viewStore.send(.cancelDownload(download.id)) }
-                    )
-                  }
-                }
-                .padding(.horizontal, .spacingM)
-              }
-              .padding(.bottom, .spacingL)
+        VStack(spacing: 0) {
+          // Tab selector
+          tabSelector(viewStore: viewStore)
+          
+          // Content based on selected tab
+          ZStack {
+            Color.appBackground.ignoresSafeArea()
+            
+            switch selectedTab {
+            case .downloads:
+              downloadsContent(viewStore: viewStore)
+            case .offline:
+              offlineLibraryContent(viewStore: viewStore)
             }
           }
         }
@@ -59,11 +53,23 @@ struct DownloadsView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
           ToolbarItem(placement: .navigationBarTrailing) {
-            Button {
-              viewStore.send(.storageInfoTapped)
-            } label: {
-              Image(systemName: "info.circle")
-                .foregroundColor(.textSecondary)
+            HStack(spacing: 16) {
+              // Quick switch to offline library if there are completed downloads
+              if viewStore.downloads.contains(where: { $0.state == .completed }) && selectedTab == .downloads {
+                Button {
+                  selectedTab = .offline
+                } label: {
+                  Image(systemName: "folder")
+                    .foregroundColor(.primaryBlue)
+                }
+              }
+              
+              Button {
+                viewStore.send(.storageInfoTapped)
+              } label: {
+                Image(systemName: "info.circle")
+                  .foregroundColor(.textSecondary)
+              }
             }
           }
         }
@@ -102,36 +108,112 @@ struct DownloadsView: View {
         }
         .fullScreenCover(
           isPresented: viewStore.binding(
-            get: \.showPlayer,
-            send: .dismissPlayer
+            get: \.showOfflinePlayer,
+            send: .dismissOfflinePlayer
           )
         ) {
-          if let download = viewStore.downloadToPlay,
-            let localFilePath = download.localFilePath
-          {
-            let localLink = ExtractedLink(
-              url: localFilePath.absoluteString,
-              quality: download.quality?.displayName,
-              server: "Local File",
-              type: .direct
-            )
-
-            PlayerView(
-              store: Store(
-                initialState: PlayerFeature.State(
-                  content: download.content,
-                  season: download.season,
-                  episode: download.episode,
-                  streamingLinks: [localLink]
-                )
-              ) {
-                PlayerFeature()
-              }
+          if let download = viewStore.offlineDownloadToPlay {
+            OfflinePlayerView(
+              download: download,
+              onDismiss: { viewStore.send(.dismissOfflinePlayer) }
             )
           }
         }
       }
     }
+  }
+  
+  /// Tab selector
+  private func tabSelector(viewStore: ViewStoreOf<DownloadsFeature>) -> some View {
+    HStack(spacing: 0) {
+      ForEach(DownloadsTab.allCases, id: \.self) { tab in
+        Button(action: { selectedTab = tab }) {
+          VStack(spacing: 4) {
+            Image(systemName: tab.icon)
+              .font(.system(size: 16, weight: .medium))
+            
+            Text(tab.title)
+              .font(.caption)
+              .fontWeight(.medium)
+          }
+          .foregroundColor(selectedTab == tab ? .primaryBlue : .textSecondary)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 12)
+        }
+      }
+    }
+    .background(Color.cardBackground)
+    .overlay(
+      Rectangle()
+        .frame(height: 0.5)
+        .foregroundColor(.textTertiary.opacity(0.3)),
+      alignment: .bottom
+    )
+  }
+  
+  /// Downloads content (current view)
+  private func downloadsContent(viewStore: ViewStoreOf<DownloadsFeature>) -> some View {
+    Group {
+      if viewStore.isLoading {
+        LoadingView()
+      } else if viewStore.downloads.isEmpty {
+        EmptyDownloadsView()
+      } else {
+        ScrollView {
+          VStack(alignment: .leading, spacing: .spacingM) {
+            // Storage bar at top
+            StorageBar(
+              used: viewStore.storageUsed,
+              available: viewStore.storageAvailable
+            )
+            .padding(.horizontal, .spacingM)
+            .padding(.top, .spacingXS)
+
+            // Compact downloads grid
+            LazyVGrid(
+              columns: [
+                GridItem(.flexible(), spacing: .spacingS),
+                GridItem(.flexible(), spacing: .spacingS),
+                GridItem(.flexible(), spacing: .spacingS)
+              ],
+              spacing: .spacingM
+            ) {
+              ForEach(viewStore.downloads) { download in
+                DownloadCard(
+                  download: download,
+                  onTap: { viewStore.send(.downloadTapped(download)) },
+                  onDelete: { viewStore.send(.deleteDownloadTapped(download)) },
+                  onPause: { viewStore.send(.pauseDownload(download.id)) },
+                  onResume: { viewStore.send(.resumeDownload(download.id)) },
+                  onCancel: { viewStore.send(.cancelDownload(download.id)) },
+                  onConvert: { viewStore.send(.convertToMP4(download)) },
+                  conversionProgress: viewStore.convertingDownloads[download.id]
+                )
+              }
+            }
+            .padding(.horizontal, .spacingM)
+          }
+          .padding(.bottom, .spacingL)
+        }
+      }
+    }
+  }
+  
+  /// Offline library content
+  private func offlineLibraryContent(viewStore: ViewStoreOf<DownloadsFeature>) -> some View {
+    OfflineLibraryView(
+      downloads: viewStore.downloads,
+      onContentTapped: { download in
+        viewStore.send(.showOfflinePlayer(download))
+      },
+      onContentDeleted: { download in
+        viewStore.send(.deleteDownloadTapped(download))
+      },
+      onContentConverted: { download in
+        viewStore.send(.convertToMP4(download))
+      },
+      conversionProgress: viewStore.convertingDownloads
+    )
   }
 }
 
@@ -233,8 +315,15 @@ struct DownloadCard: View {
   let onPause: () -> Void
   let onResume: () -> Void
   let onCancel: () -> Void
+  let onConvert: () -> Void
+  let conversionProgress: Double?
   
   @State private var showMenu = false
+  
+  private var isHLSPackage: Bool {
+    guard let localFilePath = download.localFilePath else { return false }
+    return FileManager.isHLSPackage(at: localFilePath)
+  }
   
   private var placeholderView: some View {
     ZStack {
@@ -286,7 +375,28 @@ struct DownloadCard: View {
             }
             
             // State overlay
-            if download.state == .downloading {
+            if let conversionProgress = conversionProgress {
+              // Converting overlay
+              ZStack {
+                Color.black.opacity(0.6)
+                
+                VStack(spacing: 4) {
+                  ProgressView(value: conversionProgress)
+                    .progressViewStyle(CircularProgressViewStyle(tint: .orange))
+                    .scaleEffect(1.2)
+                  
+                  Text("Converting")
+                    .font(.captionSmall)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                  
+                  Text("\(Int(conversionProgress * 100))%")
+                    .font(.captionSmall)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                }
+              }
+            } else if download.state == .downloading {
               ZStack {
                 Color.black.opacity(0.6)
                 
@@ -366,10 +476,26 @@ struct DownloadCard: View {
             .lineLimit(1)
         }
         
-        if let quality = download.quality {
-          Text(quality.displayName)
-            .font(.captionSmall)
-            .foregroundColor(.textSecondary)
+        HStack {
+          if let quality = download.quality {
+            Text(quality.displayName)
+              .font(.captionSmall)
+              .foregroundColor(.textSecondary)
+          }
+          
+          Spacer()
+          
+          // Show HLS indicator
+          if isHLSPackage {
+            Text("HLS")
+              .font(.captionSmall)
+              .fontWeight(.medium)
+              .foregroundColor(.orange)
+              .padding(.horizontal, 4)
+              .padding(.vertical, 1)
+              .background(Color.orange.opacity(0.2))
+              .cornerRadius(3)
+          }
         }
       }
       .padding(.top, 6)
@@ -394,6 +520,13 @@ struct DownloadCard: View {
         Button("downloads.action.play") {
           onTap()
         }
+        
+        if isHLSPackage {
+          Button("Convert to MP4") {
+            onConvert()
+          }
+        }
+        
         Button("downloads.action.delete", role: .destructive) {
           onDelete()
         }

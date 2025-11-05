@@ -37,8 +37,13 @@ final class DownloadQueueManager {
   /// Initializes download queue manager
   /// Loads persisted downloads and sets up observers
   func initialize() {
+    AppLogger.shared.log("DownloadQueueManager.initialize() called", level: .debug)
+    
     // Check if already initialized
-    guard !isInitialized else { return }
+    if isInitialized {
+      AppLogger.shared.log("DownloadQueueManager already initialized", level: .debug)
+      return
+    }
 
     // Load persisted downloads from storage
     loadPersistedDownloads()
@@ -51,6 +56,9 @@ final class DownloadQueueManager {
       "DownloadQueueManager initialization complete",
       level: .info
     )
+    
+    // Debug check after initialization
+    debugDownloadCounts()
   }
 
   /// Adds a download to the queue
@@ -358,6 +366,69 @@ final class DownloadQueueManager {
       || queuedDownloads.contains(where: { $0.id == downloadId })
       || completedDownloads.contains(where: { $0.id == downloadId })
   }
+  
+  /// Updates the local file path for a download (e.g., after conversion)
+  /// - Parameters:
+  ///   - downloadId: Download ID to update
+  ///   - newPath: New file path
+  func updateDownloadFilePath(_ downloadId: String, newPath: URL) {
+    // Update in completed downloads
+    if let index = completedDownloads.firstIndex(where: { $0.id == downloadId }) {
+      completedDownloads[index].localFilePath = newPath
+      persistDownloads()
+      AppLogger.shared.log(
+        "Updated file path for download: \(downloadId)",
+        level: .info
+      )
+    }
+  }
+  
+  /// Debug method to check current download counts
+  func debugDownloadCounts() {
+    AppLogger.shared.log(
+      "Current downloads - Active: \(activeDownloads.count), Queued: \(queuedDownloads.count), Completed: \(completedDownloads.count), Failed: \(failedDownloads.count)",
+      level: .debug
+    )
+  }
+  
+  /// Debug method to force reload from persistence
+  func debugReloadFromPersistence() {
+    AppLogger.shared.log("Debug: Force reloading from persistence", level: .debug)
+    loadPersistedDownloads()
+    debugDownloadCounts()
+  }
+  
+  /// Debug method to force save to persistence
+  func debugForcePersist() {
+    AppLogger.shared.log("Debug: Force persisting downloads", level: .debug)
+    persistDownloads()
+  }
+  
+  /// Debug method to clear all UserDefaults data
+  func debugClearPersistence() {
+    UserDefaults.standard.removeObject(forKey: "activeDownloads")
+    UserDefaults.standard.removeObject(forKey: "queuedDownloads")
+    UserDefaults.standard.removeObject(forKey: "completedDownloads")
+    UserDefaults.standard.removeObject(forKey: "failedDownloads")
+    AppLogger.shared.log("Debug: Cleared all persisted download data", level: .debug)
+  }
+  
+  /// Debug method to check UserDefaults data
+  func debugCheckUserDefaults() {
+    let hasActive = UserDefaults.standard.data(forKey: "activeDownloads") != nil
+    let hasQueued = UserDefaults.standard.data(forKey: "queuedDownloads") != nil
+    let hasCompleted = UserDefaults.standard.data(forKey: "completedDownloads") != nil
+    let hasFailed = UserDefaults.standard.data(forKey: "failedDownloads") != nil
+    
+    AppLogger.shared.log(
+      "UserDefaults check - Active: \(hasActive), Queued: \(hasQueued), Completed: \(hasCompleted), Failed: \(hasFailed)",
+      level: .debug
+    )
+    
+    if let completedData = UserDefaults.standard.data(forKey: "completedDownloads") {
+      AppLogger.shared.log("Completed downloads data size: \(completedData.count) bytes", level: .debug)
+    }
+  }
 
   /// Persists downloads to storage
   /// Saves download state for restoration
@@ -393,6 +464,19 @@ final class DownloadQueueManager {
   /// Loads persisted downloads from storage
   /// Restores download state on app launch
   private func loadPersistedDownloads() {
+    AppLogger.shared.log("Starting to load persisted downloads", level: .debug)
+    
+    // Check if UserDefaults has any data
+    let hasActiveData = UserDefaults.standard.data(forKey: "activeDownloads") != nil
+    let hasQueuedData = UserDefaults.standard.data(forKey: "queuedDownloads") != nil
+    let hasCompletedData = UserDefaults.standard.data(forKey: "completedDownloads") != nil
+    let hasFailedData = UserDefaults.standard.data(forKey: "failedDownloads") != nil
+    
+    AppLogger.shared.log(
+      "UserDefaults data availability - Active: \(hasActiveData), Queued: \(hasQueuedData), Completed: \(hasCompletedData), Failed: \(hasFailedData)",
+      level: .debug
+    )
+    
     do {
       let decoder = JSONDecoder()
       decoder.dateDecodingStrategy = .iso8601
@@ -400,35 +484,49 @@ final class DownloadQueueManager {
       // Load from UserDefaults
       if let activeData = UserDefaults.standard.data(forKey: "activeDownloads") {
         activeDownloads = try decoder.decode([Download].self, from: activeData)
+        AppLogger.shared.log("Loaded \(activeDownloads.count) active downloads", level: .debug)
       }
 
       if let queuedData = UserDefaults.standard.data(forKey: "queuedDownloads") {
         queuedDownloads = try decoder.decode([Download].self, from: queuedData)
+        AppLogger.shared.log("Loaded \(queuedDownloads.count) queued downloads", level: .debug)
       }
 
       if let completedData = UserDefaults.standard.data(forKey: "completedDownloads") {
-        completedDownloads = try decoder.decode([Download].self, from: completedData)
+        let loadedCompleted = try decoder.decode([Download].self, from: completedData)
+        AppLogger.shared.log("Loaded \(loadedCompleted.count) completed downloads from storage", level: .debug)
 
         // Verify that downloaded files still exist
-        completedDownloads = completedDownloads.filter { download in
-          guard let filePath = download.localFilePath else { return false }
+        completedDownloads = loadedCompleted.filter { download in
+          guard let filePath = download.localFilePath else { 
+            AppLogger.shared.log("Download has no local file path: \(download.content.title)", level: .warning)
+            return false 
+          }
           let fileExists = FileManager.default.fileExists(atPath: filePath.path)
           if !fileExists {
             AppLogger.shared.log(
-              "Downloaded file missing: \(download.content.title)",
+              "Downloaded file missing: \(download.content.title) at \(filePath.path)",
               level: .warning
+            )
+          } else {
+            AppLogger.shared.log(
+              "Verified file exists: \(download.content.title) at \(filePath.path)",
+              level: .debug
             )
           }
           return fileExists
         }
+        
+        AppLogger.shared.log("After file verification: \(completedDownloads.count) completed downloads", level: .debug)
       }
 
       if let failedData = UserDefaults.standard.data(forKey: "failedDownloads") {
         failedDownloads = try decoder.decode([Download].self, from: failedData)
+        AppLogger.shared.log("Loaded \(failedDownloads.count) failed downloads", level: .debug)
       }
 
       AppLogger.shared.log(
-        "Persisted downloads loaded: \(activeDownloads.count) active, \(completedDownloads.count) completed",
+        "Persisted downloads loaded: \(activeDownloads.count) active, \(queuedDownloads.count) queued, \(completedDownloads.count) completed, \(failedDownloads.count) failed",
         level: .info
       )
     } catch {

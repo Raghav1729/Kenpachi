@@ -45,7 +45,17 @@ final class DownloadRepository: DownloadRepositoryProtocol {
   
   /// Delete download
   func deleteDownload(id: String) async throws {
-    /// TODO: Delete from CoreData and file system
+    // Find the download
+    guard let download = downloads.first(where: { $0.id == id }) else {
+      return
+    }
+    
+    // Delete the file from file system if it exists
+    if let localFilePath = download.localFilePath {
+      FileManager.deleteDownloadedFile(at: localFilePath)
+    }
+    
+    /// TODO: Delete from CoreData
     downloads.removeAll { $0.id == id }
   }
   
@@ -81,24 +91,28 @@ final class DownloadRepository: DownloadRepositoryProtocol {
   
   /// Get storage info
   func getStorageInfo() async throws -> (used: Int64, available: Int64) {
-    /// TODO: Calculate actual storage usage
-    let used: Int64 = downloads.reduce(0) { $0 + ($1.fileSize ?? 0) }
+    // Get actual storage usage from file system
+    let used = FileManager.getTotalDownloadsSize()
     
-    /// Get available storage from file system
-    if let attributes = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory()),
-       let freeSize = attributes[.systemFreeSize] as? Int64 {
-      return (used, freeSize)
-    }
+    // Get available storage from file system
+    let available = FileManager.getAvailableStorageSpace() ?? 0
     
-    return (used, 0)
+    return (used, available)
   }
   
   /// Clear completed downloads
   func clearCompletedDownloads() async throws {
-    /// TODO: Delete completed downloads from file system
-    let completedIds = downloads.filter { $0.state == .completed }.map { $0.id }
-    for id in completedIds {
-      try await deleteDownload(id: id)
+    // Get completed downloads
+    let completedDownloads = downloads.filter { $0.state == .completed }
+    
+    // Delete each completed download (including file)
+    for download in completedDownloads {
+      try await deleteDownload(id: download.id)
     }
+    
+    AppLogger.shared.log(
+      "Cleared \(completedDownloads.count) completed downloads",
+      level: .info
+    )
   }
 }
