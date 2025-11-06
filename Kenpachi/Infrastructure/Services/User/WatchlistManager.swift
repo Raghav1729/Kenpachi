@@ -41,7 +41,7 @@ final class WatchlistManager {
     )
     return entries
   }
-  
+
   /// Fetch watchlist content with full details for current scraper
   func fetchWatchlistContent() async throws -> [Content] {
     let currentScraper = ScraperManager.shared.getActiveScraper()?.name ?? "Unknown"
@@ -58,7 +58,7 @@ final class WatchlistManager {
       do {
         let content = try await contentRepository.fetchContentDetails(
           id: entry.contentId,
-          type: entry.type
+          type: entry.contentType
         )
         contents.append(content)
       } catch {
@@ -94,14 +94,14 @@ final class WatchlistManager {
   }
 
   /// Remove content from watchlist for current scraper
-  func removeFromWatchlist(contentId: String) async throws {
+  func removeFromWatchlist(contentId: String, contentType: ContentType) async throws {
     let currentScraper = ScraperManager.shared.getActiveScraper()?.name ?? "Unknown"
     AppLogger.shared.log(
       "Removing content \(contentId) from watchlist for \(currentScraper)",
       level: .debug
     )
 
-    try await userRepository.removeFromWatchlist(contentId: contentId)
+    try await userRepository.removeFromWatchlist(contentId: contentId, contentType: contentType)
 
     AppLogger.shared.log(
       "Content \(contentId) removed from watchlist for \(currentScraper)",
@@ -110,8 +110,9 @@ final class WatchlistManager {
   }
 
   /// Check if content is in watchlist
-  func isInWatchlist(contentId: String) async throws -> Bool {
-    let isInWatchlist = try await userRepository.isInWatchlist(contentId: contentId)
+  func isInWatchlist(contentId: String, contentType: ContentType) async throws -> Bool {
+    let isInWatchlist = try await userRepository.isInWatchlist(
+      contentId: contentId, contentType: contentType)
 
     AppLogger.shared.log(
       "Content \(contentId) in watchlist: \(isInWatchlist)",
@@ -122,15 +123,17 @@ final class WatchlistManager {
   }
 
   /// Toggle watchlist status
-  func toggleWatchlist(contentId: String) async throws -> Bool {
-    let isInWatchlist = try await isInWatchlist(contentId: contentId)
+  func toggleWatchlist(contentId: String, contentType: ContentType) async throws -> Bool {
+    let isInWatchlist = try await isInWatchlist(contentId: contentId, contentType: contentType)
 
     if isInWatchlist {
-      try await removeFromWatchlist(contentId: contentId)
+      try await removeFromWatchlist(contentId: contentId, contentType: contentType)
       return false
     } else {
       // First fetch content details to get full information
-      let content = try await contentRepository.fetchContentDetails(id: contentId, type: nil)
+      //let content = try await contentRepository.fetchContentDetails(contentId: contentId, contentType: contentType)
+      let content = try await contentRepository.fetchContentDetails(
+        id: contentId, type: contentType)
       try await addToWatchlist(content)
       return true
     }

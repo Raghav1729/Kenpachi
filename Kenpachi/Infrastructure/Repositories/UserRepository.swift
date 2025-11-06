@@ -54,18 +54,18 @@ final class UserRepository: UserRepositoryProtocol {
   func fetchWatchlist() async throws -> Watchlist {
     let currentScraper = ScraperManager.shared.getActiveScraper()?.name ?? "default"
     let scraperKey = "\(watchlistKey)"
-    
+
     if let data = userDefaults.data(forKey: scraperKey),
       let watchlist = try? decoder.decode(Watchlist.self, from: data)
     {
       /// Filter entries to only include those from the current scraper
       let filteredEntries = watchlist.entriesForScraper(currentScraper)
-      
+
       AppLogger.shared.log(
         "Fetched watchlist for scraper \(currentScraper): \(filteredEntries.count) items",
         level: .debug
       )
-      
+
       /// Return a new watchlist with filtered entries, preserving the original
       return Watchlist(
         id: watchlist.id,
@@ -75,7 +75,7 @@ final class UserRepository: UserRepositoryProtocol {
         updatedAt: watchlist.updatedAt
       )
     }
-    
+
     /// Return empty watchlist if none exists
     AppLogger.shared.log(
       "No watchlist found, creating new empty watchlist for scraper \(currentScraper)",
@@ -83,17 +83,17 @@ final class UserRepository: UserRepositoryProtocol {
     )
     return Watchlist(userId: "default-user")
   }
-  
+
   /// Fetch full watchlist (all scrapers) - internal use only
   private func fetchFullWatchlist() async throws -> Watchlist {
     let scraperKey = "\(watchlistKey)"
-    
+
     if let data = userDefaults.data(forKey: scraperKey),
       let watchlist = try? decoder.decode(Watchlist.self, from: data)
     {
       return watchlist
     }
-    
+
     /// Return empty watchlist if none exists
     return Watchlist(userId: "default-user")
   }
@@ -107,32 +107,34 @@ final class UserRepository: UserRepositoryProtocol {
   ) async throws {
     let currentScraper = ScraperManager.shared.getActiveScraper()?.name ?? "default"
     let scraperKey = "\(watchlistKey)"
-    
+
     /// Fetch full watchlist to preserve entries from other scrapers
     var watchlist = try await fetchFullWatchlist()
-    
+
     /// Check if content already exists in watchlist
-    if watchlist.contains(contentId: contentId, scraperSource: currentScraper) {
+    if watchlist.contains(
+      contentId: contentId, scraperSource: currentScraper, contentType: contentType)
+    {
       AppLogger.shared.log(
         "Content \(contentId) already exists in watchlist for scraper \(currentScraper)",
         level: .debug
       )
       return
     }
-    
+
     /// Add content to watchlist
     watchlist.add(
       contentId: contentId,
       scraperSource: currentScraper,
       title: title,
       fullPosterURL: imageURL,
-      type: contentType
+      contentType: contentType
     )
-    
+
     /// Save updated watchlist
     let data = try encoder.encode(watchlist)
     userDefaults.set(data, forKey: scraperKey)
-    
+
     AppLogger.shared.log(
       "Added content \(contentId) to watchlist for scraper \(currentScraper)",
       level: .info
@@ -140,18 +142,18 @@ final class UserRepository: UserRepositoryProtocol {
   }
 
   /// Remove from watchlist
-  func removeFromWatchlist(contentId: String) async throws {
+  func removeFromWatchlist(contentId: String, contentType: ContentType) async throws {
     let currentScraper = ScraperManager.shared.getActiveScraper()?.name ?? "default"
     let scraperKey = "\(watchlistKey)"
-    
+
     /// Fetch full watchlist to preserve entries from other scrapers
     var watchlist = try await fetchFullWatchlist()
-    watchlist.remove(contentId: contentId, scraperSource: currentScraper)
-    
+    watchlist.remove(contentId: contentId, scraperSource: currentScraper, contentType: contentType)
+
     /// Save updated watchlist
     let data = try encoder.encode(watchlist)
     userDefaults.set(data, forKey: scraperKey)
-    
+
     AppLogger.shared.log(
       "Removed content \(contentId) from watchlist for scraper \(currentScraper)",
       level: .info
@@ -159,10 +161,11 @@ final class UserRepository: UserRepositoryProtocol {
   }
 
   /// Check if content is in watchlist for current scraper
-  func isInWatchlist(contentId: String) async throws -> Bool {
+  func isInWatchlist(contentId: String, contentType: ContentType) async throws -> Bool {
     let currentScraper = ScraperManager.shared.getActiveScraper()?.name ?? "default"
     let watchlist = try await fetchWatchlist()
-    return watchlist.contains(contentId: contentId, scraperSource: currentScraper)
+    return watchlist.contains(
+      contentId: contentId, scraperSource: currentScraper, contentType: contentType)
   }
 
   // MARK: - Watch History
@@ -170,7 +173,7 @@ final class UserRepository: UserRepositoryProtocol {
   /// Fetch watch history
   func fetchWatchHistory() async throws -> WatchHistory {
     let currentScraper = ScraperManager.shared.getActiveScraper()?.name ?? "FlixHQ"
-    
+
     if let data = userDefaults.data(forKey: watchHistoryKey),
       let history = try? decoder.decode(WatchHistory.self, from: data)
     {
@@ -178,7 +181,7 @@ final class UserRepository: UserRepositoryProtocol {
       let filteredEntries = history.entries.filter { entry in
         entry.scraperSource == currentScraper && entry.isInProgress
       }
-      
+
       // Return history with filtered entries
       return WatchHistory(
         id: history.id,
@@ -195,12 +198,11 @@ final class UserRepository: UserRepositoryProtocol {
   /// Update watch history entry
   func updateWatchHistoryEntry(_ entry: WatchHistoryEntry) async throws {
     var history = try await fetchWatchHistory()
-    
+
     // Check if an entry with matching contentId, seasonId, and episodeId already exists
     if let existingIndex = history.entries.firstIndex(where: { existingEntry in
-      existingEntry.contentId == entry.contentId &&
-      existingEntry.seasonId == entry.seasonId &&
-      existingEntry.episodeId == entry.episodeId
+      existingEntry.contentId == entry.contentId && existingEntry.seasonId == entry.seasonId
+        && existingEntry.episodeId == entry.episodeId
     }) {
       // Update the existing entry
       history.entries[existingIndex] = entry
@@ -208,7 +210,7 @@ final class UserRepository: UserRepositoryProtocol {
       // Insert new entry
       history.entries.append(entry)
     }
-    
+
     history.updatedAt = Date()
     let data = try encoder.encode(history)
     userDefaults.set(data, forKey: watchHistoryKey)

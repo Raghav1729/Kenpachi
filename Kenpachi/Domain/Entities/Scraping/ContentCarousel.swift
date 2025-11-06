@@ -20,6 +20,7 @@ struct ContentCarousel: Codable, Identifiable, Equatable {
         case hero
         case trending
         case popular
+        case topRated
         case recent
         case recommended
         case continueWatching

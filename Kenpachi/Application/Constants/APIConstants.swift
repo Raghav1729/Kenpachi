@@ -63,23 +63,6 @@ enum APIConstants {
     static let rateLimitWindow = 60
   }
 
-  // MARK: - Scraper Configuration
-  /// Base URLs for various scraper sources
-  enum Scrapers {
-    /// FlixHQ scraper (default for movies/TV)
-    static let flixHQBaseURL = "https://flixhq.to"
-    /// FMovies scraper (alternative for movies/TV)
-    static let fmoviesBaseURL = "https://fmovies.to"
-    /// VidSrc scraper (alternative for movies/TV)
-    static let vidSrcBaseURL = "https://vidsrc.to"
-    /// HiAnime scraper (default for anime)
-    static let hiAnimeBaseURL = "https://hianime.to"
-    /// GogoAnime scraper (alternative for anime)
-    static let gogoAnimeBaseURL = "https://gogoanime.lu"
-    /// AnimeKai scraper (alternative for anime)
-    static let animeKaiBaseURL = "https://animekai.ru"
-  }
-
   // MARK: - Network Configuration
   /// General network settings
   enum Network {

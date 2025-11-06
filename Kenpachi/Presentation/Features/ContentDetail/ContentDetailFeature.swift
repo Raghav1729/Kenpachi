@@ -167,10 +167,10 @@ struct ContentDetailFeature {
         state.similarContent = content.recommendations ?? []
 
         // Return a side effect to check if the content is in the user's watchlist.
-        return .run { [contentId = state.contentId] send in
+        return .run { [contentId = state.contentId, type = state.type] send in
           do {
             let isInWatchlist = try await WatchlistManager.shared.isInWatchlist(
-              contentId: contentId)
+              contentId: contentId, contentType: type ?? .movie)
             await send(.watchlistStatusLoaded(isInWatchlist))
           } catch {
             // If an error occurs, log a warning message.
@@ -233,7 +233,8 @@ struct ContentDetailFeature {
         }
 
         // Return a side effect to extract the streaming links from the repository.
-        return .run { [contentId = state.contentId, episodeId] send in
+        return .run {
+          [contentId = state.contentId, seasonId = state.selectedSeason?.id, episodeId] send in
           do {
             // Create an instance of the `ContentRepository`.
             let contentRepository = await ContentRepository()
@@ -241,6 +242,7 @@ struct ContentDetailFeature {
             // Extract the streaming links from the repository.
             let links = try await contentRepository.extractStreamingLinks(
               contentId: contentId,
+              seasonId: seasonId,
               episodeId: episodeId
             )
 
@@ -300,9 +302,10 @@ struct ContentDetailFeature {
         state.isInWatchlist = false
 
         // Return a side effect to remove the content from the watchlist.
-        return .run { [contentId = state.contentId] send in
+        return .run { [contentId = state.contentId, type = state.type] send in
           do {
-            try await WatchlistManager.shared.removeFromWatchlist(contentId: contentId)
+            try await WatchlistManager.shared.removeFromWatchlist(
+              contentId: contentId, contentType: type ?? .movie)
             await send(.watchlistToggled(false))
           } catch {
             await AppLogger.shared.log("Failed to remove from watchlist: \(error)", level: .error)

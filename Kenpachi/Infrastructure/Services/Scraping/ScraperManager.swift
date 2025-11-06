@@ -39,21 +39,12 @@ final class ScraperManager {
   }
 
   /// Registers default scrapers for movies, TV shows, and anime
-  /// Includes FlixHQ (default), 111Movies, VidSrc, VidRock, VidFast, VidNest for movies/TV
-  /// and HiAnime, GogoAnime, AnimeKai for anime content
+  /// Includes FlixHQ (default) for movies/TV
   private func registerDefaultScrapers() {
     // Movie/TV scrapers - FlixHQ is primary/default
     registerScraper(FlixHQ())
-    registerScraper(Movies111())
-    registerScraper(VidSrc())
-    registerScraper(VidRock())
-    registerScraper(VidFast())
-    registerScraper(VidNest())
-
-    // Anime scrapers
-    registerScraper(HiAnime())
-    registerScraper(GogoAnime())
-    registerScraper(AnimeKai())
+    // MP4Hydra host-only scraper (extraction focused)
+    registerScraper(MP4Hydra())
 
     // Log registered scrapers
     AppLogger.shared.log(

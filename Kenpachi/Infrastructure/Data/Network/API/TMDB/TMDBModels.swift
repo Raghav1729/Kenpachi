@@ -12,11 +12,83 @@ struct TMDBPagedResponse<T: Decodable>: Decodable {
   let totalResults: Int
 }
 
+/// Unified multi-search result that can represent either a movie or TV item (or person)
+struct TMDBMultiResult: Decodable {
+  let id: Int
+  let mediaType: String
+  // Movie fields
+  let title: String?
+  let originalTitle: String?
+  let releaseDate: String?
+  // TV fields
+  let name: String?
+  let originalName: String?
+  let firstAirDate: String?
+  // Shared/optional fields
+  let overview: String?
+  let posterPath: String?
+  let backdropPath: String?
+  let voteAverage: Double?
+  let voteCount: Int?
+  let popularity: Double?
+  let originalLanguage: String?
+  let genreIds: [Int]?
+
+  func toContent() -> Content? {
+    switch mediaType {
+    case "movie":
+      return Content(
+        id: String(id),
+        type: .movie,
+        title: title ?? "",
+        originalTitle: originalTitle,
+        overview: overview,
+        posterPath: posterPath,
+        backdropPath: backdropPath,
+        releaseDate: parseDate(releaseDate),
+        voteAverage: voteAverage,
+        voteCount: voteCount,
+        popularity: popularity,
+        originalLanguage: originalLanguage,
+        genreIds: genreIds,
+        adult: false
+      )
+    case "tv":
+      return Content(
+        id: String(id),
+        type: .tvShow,
+        title: name ?? "",
+        originalTitle: originalName,
+        overview: overview,
+        posterPath: posterPath,
+        backdropPath: backdropPath,
+        releaseDate: parseDate(firstAirDate),
+        voteAverage: voteAverage,
+        voteCount: voteCount,
+        popularity: popularity,
+        originalLanguage: originalLanguage,
+        genreIds: genreIds,
+        adult: false
+      )
+    default:
+      return nil // skip persons and other types
+    }
+  }
+
+  private func parseDate(_ dateString: String?) -> Date? {
+    guard let dateString = dateString else { return nil }
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.date(from: dateString)
+  }
+}
+
 /// TMDB movie model
 struct TMDBMovie: Decodable {
   let id: Int
   let title: String
   let originalTitle: String?
+  let mediaType: String?
   let overview: String?
   let posterPath: String?
   let backdropPath: String?
@@ -101,6 +173,7 @@ struct TMDBTVShow: Decodable {
   let id: Int
   let name: String
   let originalName: String?
+  let mediaType: String?
   let overview: String?
   let posterPath: String?
   let backdropPath: String?
@@ -151,7 +224,7 @@ struct TMDBTVShow: Decodable {
       recommendations: recommendations?.results.prefix(10).compactMap { result in
         Content(
           id: String(result.id),
-          type: .tvShow,
+          type: mediaType == "movie" ? .movie : .tvShow,
           title: result.title ?? "",
           posterPath: result.posterPath,
           backdropPath: result.backdropPath

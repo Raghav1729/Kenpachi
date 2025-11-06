@@ -12,7 +12,7 @@ final class MockUserRepository {
   func updateUserProfile(_ profile: Any) async throws -> Any { profile }
   func fetchWatchlist() async throws -> Any { () }
   func addToWatchlist(contentId: String) async throws {}
-  func removeFromWatchlist(contentId: String) async throws {}
+  func removeFromWatchlist(contentId: String, contentType: ContentType) async throws {}
   func isInWatchlist(contentId: String) async throws -> Bool { false }
   func fetchWatchHistory() async throws -> Any { () }
   func updateWatchHistoryEntry(_ entry: Any) async throws {}

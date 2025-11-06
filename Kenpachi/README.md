@@ -234,12 +234,8 @@ Kenpachi/
 │   │   │       └── Sources/
 │   │   │           ├── Movies/
 │   │   │           │   ├── FlixHQ.swift
-│   │   │           │   ├── FMovies.swift
-│   │   │           │   └── VidSrc.swift
+│   │   │           │   └── MP4Hydra.swift
 │   │   │           └── Anime/
-│   │   │               ├── HiAnime.swift
-│   │   │               ├── GogoAnime.swift
-│   │   │               └── AnimeKai.swift
 │   │   └── Persistence/
 │   │       ├── CoreData/
 │   │       │   ├── CoreDataStack.swift

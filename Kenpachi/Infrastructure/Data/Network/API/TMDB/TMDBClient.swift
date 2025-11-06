@@ -17,6 +17,46 @@ final class TMDBClient {
     self.networkClient = networkClient
   }
 
+  /// Fetches top-rated movies
+  /// - Returns: Array of movies (released only)
+  func fetchTopRatedMovies() async throws -> [Content] {
+    let endpoint = TMDBEndpoint.topRatedMovies
+    let response: TMDBPagedResponse<TMDBMovie> = try await networkClient.request(endpoint)
+    return response.results
+      .filter { $0.isReleased() }
+      .map { $0.toContent() }
+  }
+
+  /// Fetches top-rated TV shows
+  /// - Returns: Array of TV shows (released only)
+  func fetchTopRatedTVShows() async throws -> [Content] {
+    let endpoint = TMDBEndpoint.topRatedTVShows
+    let response: TMDBPagedResponse<TMDBTVShow> = try await networkClient.request(endpoint)
+    return response.results
+      .filter { $0.isReleased() }
+      .map { $0.toContent() }
+  }
+
+  /// Fetches popular movies
+  /// - Returns: Array of movies (released only)
+  func fetchPopularMovies() async throws -> [Content] {
+    let endpoint = TMDBEndpoint.popularMovies
+    let response: TMDBPagedResponse<TMDBMovie> = try await networkClient.request(endpoint)
+    return response.results
+      .filter { $0.isReleased() }
+      .map { $0.toContent() }
+  }
+
+  /// Fetches popular TV shows
+  /// - Returns: Array of TV shows (released only)
+  func fetchPopularTVShows() async throws -> [Content] {
+    let endpoint = TMDBEndpoint.popularTVShows
+    let response: TMDBPagedResponse<TMDBTVShow> = try await networkClient.request(endpoint)
+    return response.results
+      .filter { $0.isReleased() }
+      .map { $0.toContent() }
+  }
+
   /// Fetches trending movies
   /// - Parameter timeWindow: Time window for trending (day or week)
   /// - Returns: Array of trending movies (only released)
@@ -95,31 +135,15 @@ final class TMDBClient {
     return season.toSeason()
   }
 
-  /// Searches for content
+  /// Search for movies and TV shows using TMDB /search/multi
   /// - Parameters:
   ///   - query: Search query string
-  ///   - type: Content type to search for
-  /// - Returns: Array of matching content (only released)
-  func search(query: String, type: ContentType) async throws -> [Content] {
-    let endpoint = TMDBEndpoint.search(query: query, type: type)
-
-    switch type {
-    case .movie:
-      let response: TMDBPagedResponse<TMDBMovie> = try await networkClient.request(endpoint)
-      // Filter to only include released movies
-      return response.results
-        .filter { $0.isReleased() }
-        .map { $0.toContent() }
-    case .tvShow:
-      let response: TMDBPagedResponse<TMDBTVShow> = try await networkClient.request(endpoint)
-      // Filter to only include released TV shows
-      return response.results
-        .filter { $0.isReleased() }
-        .map { $0.toContent() }
-    case .anime:
-      // Anime search handled by AniList
-      return []
-    }
+  ///   - page: Page number
+  /// - Returns: TMDB paged response with mixed results
+  func search(query: String, page: Int) async throws -> TMDBPagedResponse<TMDBMultiResult> {
+    let endpoint = TMDBEndpoint.search(query: query, page: page)
+    let response: TMDBPagedResponse<TMDBMultiResult> = try await networkClient.request(endpoint)
+    return response
   }
 }
 

@@ -17,17 +17,17 @@ struct WatchlistEntry: Equatable, Identifiable, Codable {
   /// Full poster URL for the content
   let fullPosterURL: URL?
   /// Type of content (movie/show)
-  let type: ContentType
+  let contentType: ContentType
   /// Date when entry was added
   let addedAt: Date
-  
+
   init(
     id: String = UUID().uuidString,
     contentId: String,
     scraperSource: String,
     title: String,
     fullPosterURL: URL?,
-    type: ContentType,
+    contentType: ContentType,
     addedAt: Date = Date()
   ) {
     self.id = id
@@ -35,7 +35,7 @@ struct WatchlistEntry: Equatable, Identifiable, Codable {
     self.scraperSource = scraperSource
     self.title = title
     self.fullPosterURL = fullPosterURL
-    self.type = type
+    self.contentType = contentType
     self.addedAt = addedAt
   }
 }
@@ -52,7 +52,7 @@ struct Watchlist: Equatable, Identifiable, Codable {
   let createdAt: Date
   /// Date when watchlist was last updated
   var updatedAt: Date
-  
+
   /// Initializer
   init(
     id: String = UUID().uuidString,
@@ -67,53 +67,57 @@ struct Watchlist: Equatable, Identifiable, Codable {
     self.createdAt = createdAt
     self.updatedAt = updatedAt
   }
-  
+
   /// Number of items in watchlist
   var count: Int {
     entries.count
   }
-  
+
   /// Whether watchlist is empty
   var isEmpty: Bool {
     entries.isEmpty
   }
-  
+
   /// Check if content is in watchlist
   func contains(_ contentId: String) -> Bool {
     entries.contains { $0.contentId == contentId }
   }
-  
-  /// Check if content from specific scraper is in watchlist
-  func contains(contentId: String, scraperSource: String) -> Bool {
-    entries.contains { $0.contentId == contentId && $0.scraperSource == scraperSource }
+
+  /// Check if content from specific scraper and type is in watchlist
+  func contains(contentId: String, scraperSource: String, contentType: ContentType) -> Bool {
+    entries.contains {
+      $0.contentId == contentId && $0.scraperSource == scraperSource && $0.contentType == contentType
+    }
   }
-  
+
   /// Add content to watchlist
   mutating func add(
     contentId: String,
     scraperSource: String,
     title: String,
     fullPosterURL: URL?,
-    type: ContentType
+    contentType: ContentType
   ) {
-    guard !contains(contentId: contentId, scraperSource: scraperSource) else { return }
+    guard !contains(contentId: contentId, scraperSource: scraperSource, contentType: contentType) else { return }
     let entry = WatchlistEntry(
       contentId: contentId,
       scraperSource: scraperSource,
       title: title,
       fullPosterURL: fullPosterURL,
-      type: type
+      contentType: contentType
     )
     entries.append(entry)
     updatedAt = Date()
   }
-  
+
   /// Remove content from watchlist
-  mutating func remove(contentId: String, scraperSource: String) {
-    entries.removeAll { $0.contentId == contentId && $0.scraperSource == scraperSource }
+  mutating func remove(contentId: String, scraperSource: String, contentType: ContentType) {
+    entries.removeAll {
+      $0.contentId == contentId && $0.scraperSource == scraperSource && $0.contentType == contentType
+    }
     updatedAt = Date()
   }
-  
+
   /// Get watchlist entries for a specific scraper
   func entriesForScraper(_ scraperSource: String) -> [WatchlistEntry] {
     entries.filter { $0.scraperSource == scraperSource }

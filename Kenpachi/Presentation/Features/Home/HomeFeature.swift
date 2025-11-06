@@ -157,7 +157,7 @@ struct HomeFeature {
             // For each hero item, check if it is in the user's watchlist.
             for item in heroItems {
               let isInWatchlist = try await WatchlistManager.shared.isInWatchlist(
-                contentId: item.id)
+                contentId: item.id, contentType: item.type)
               // Dispatch the `heroWatchlistStatusLoaded` action with the result.
               await send(.heroWatchlistStatusLoaded(item.id, isInWatchlist))
             }
@@ -260,7 +260,7 @@ struct HomeFeature {
           do {
             // Toggle the watchlist status.
             let finalStatus = try await WatchlistManager.shared.toggleWatchlist(
-              contentId: content.id)
+              contentId: content.id, contentType: content.type)
             // Dispatch the `watchlistToggled` action with the final status.
             await send(.watchlistToggled(content.id, finalStatus))
 

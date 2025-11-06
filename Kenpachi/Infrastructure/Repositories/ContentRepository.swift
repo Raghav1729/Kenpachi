@@ -111,7 +111,7 @@ final class ContentRepository: ContentRepositoryProtocol {
     let sourceName = scraperManager.getActiveScraper()?.name ?? "unknown"
 
     // Check cache first with source-specific key for scraper content
-    let cacheKey = "\(sourceName)_\(id)"
+    let cacheKey = "\(sourceName)_\(id)\(type.map { "_\($0.rawValue)" } ?? "")"
     if let cachedContent = await contentCache.getContentDetails(forId: cacheKey) {
       return cachedContent
     }

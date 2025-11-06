@@ -175,14 +175,7 @@ struct ScraperSourcePicker: View {
   private func descriptionForSource(_ source: ScraperSource) -> String {
     switch source {
     case .FlixHQ: return "High quality streams, reliable"
-    case .Movies111: return "Fast streaming, HD quality"
-    case .VidSrc: return "Fast streaming, multiple servers"
-    case .VidRock: return "Encrypted streams, secure playback"
-    case .VidFast: return "Fast encrypted streams, HD quality"
-    case .VidNest: return "Multiple servers, adaptive quality"
-    case .AnimeKai: return "Anime focused, high quality"
-    case .GogoAnime: return "Popular anime source"
-    case .HiAnime: return "Premium anime streaming"
+    case .MP4Hydra: return "Host-only provider (link extraction)"
     }
   }
 }
