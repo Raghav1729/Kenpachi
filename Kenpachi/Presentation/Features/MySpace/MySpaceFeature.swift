@@ -59,6 +59,8 @@ struct MySpaceFeature {
     case settings(PresentationAction<SettingsFeature.Action>)
     /// Remove from watchlist
     case removeFromWatchlist(String, ContentType)
+    /// Clear watchlist
+    case clearWatchlist
     /// Clear watch history
     case clearWatchHistory
     /// Error occurred
@@ -206,6 +208,18 @@ struct MySpaceFeature {
           do {
             try await WatchlistManager.shared.removeFromWatchlist(
               contentId: contentId, contentType: contentType)
+          } catch {
+            await send(.errorOccurred(error.localizedDescription))
+          }
+        }
+
+      case .clearWatchlist:
+        /// Clear watchlist
+        state.watchlist = []
+
+        return .run { send in
+          do {
+            try await WatchlistManager.shared.clearWatchlist()
           } catch {
             await send(.errorOccurred(error.localizedDescription))
           }

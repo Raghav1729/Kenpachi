@@ -160,6 +160,22 @@ final class UserRepository: UserRepositoryProtocol {
     )
   }
 
+  /// Clear watchlist for the current scraper
+  func clearWatchlist() async throws {
+    let scraperKey = "\(watchlistKey)"
+
+    var watchlist = try await fetchFullWatchlist()
+    watchlist.entries.removeAll()
+
+    let data = try encoder.encode(watchlist)
+    userDefaults.set(data, forKey: scraperKey)
+
+    AppLogger.shared.log(
+      "Cleared entire watchlist (all scrapers)",
+      level: .info
+    )
+  }
+
   /// Check if content is in watchlist for current scraper
   func isInWatchlist(contentId: String, contentType: ContentType) async throws -> Bool {
     let currentScraper = ScraperManager.shared.getActiveScraper()?.name ?? "default"
@@ -217,9 +233,9 @@ final class UserRepository: UserRepositoryProtocol {
   }
 
   /// Remove watch history entry
-  func removeWatchHistoryEntry(id: String) async throws {
+  func removeWatchHistoryEntry(contentId: String, contentType: ContentType) async throws {
     var history = try await fetchWatchHistory()
-    history.removeEntry(id)
+      history.removeEntry(contentId, contentType)
     let data = try encoder.encode(history)
     userDefaults.set(data, forKey: watchHistoryKey)
   }

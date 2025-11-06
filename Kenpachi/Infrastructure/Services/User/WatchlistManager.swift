@@ -144,4 +144,12 @@ final class WatchlistManager {
     let watchlist = try await userRepository.fetchWatchlist()
     return watchlist.count
   }
+
+  /// Clear watchlist for the current scraper
+  func clearWatchlist() async throws {
+    let currentScraper = ScraperManager.shared.getActiveScraper()?.name ?? "Unknown"
+    AppLogger.shared.log("Clearing watchlist for \(currentScraper)", level: .debug)
+    try await userRepository.clearWatchlist()
+    AppLogger.shared.log("Cleared watchlist for \(currentScraper)", level: .info)
+  }
 }

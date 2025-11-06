@@ -87,6 +87,7 @@ final class WatchHistoryManager {
       id: UUID().uuidString,
       contentId: content.id,
       title: content.title,
+      contentType: content.type,
       seasonId: season?.id,
       episodeId: episode?.id,
       seasonNumber: episode?.seasonNumber ?? (content.type != .movie ? 1 : nil),
@@ -105,10 +106,10 @@ final class WatchHistoryManager {
   }
 
   /// Remove entry from watch history
-  func removeFromHistory(contentId: String) async throws {
+  func removeFromHistory(contentId: String, contentType: ContentType) async throws {
     AppLogger.shared.log("Removing content \(contentId) from watch history", level: .debug)
 
-    try await userRepository.removeWatchHistoryEntry(id: contentId)
+    try await userRepository.removeWatchHistoryEntry(contentId: contentId, contentType: contentType)
 
     AppLogger.shared.log("Content \(contentId) removed from watch history", level: .info)
   }

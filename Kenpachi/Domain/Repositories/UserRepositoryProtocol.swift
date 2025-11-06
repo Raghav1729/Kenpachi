@@ -29,6 +29,9 @@ protocol UserRepositoryProtocol {
   /// Check if content is in watchlist for current scraper
   func isInWatchlist(contentId: String, contentType: ContentType) async throws -> Bool
 
+  /// Clear watchlist for the current scraper
+  func clearWatchlist() async throws
+
   /// Fetch watch history
   func fetchWatchHistory() async throws -> WatchHistory
 
@@ -36,7 +39,7 @@ protocol UserRepositoryProtocol {
   func updateWatchHistoryEntry(_ entry: WatchHistoryEntry) async throws
 
   /// Remove watch history entry
-  func removeWatchHistoryEntry(id: String) async throws
+  func removeWatchHistoryEntry(contentId: String, contentType: ContentType) async throws
 
   /// Clear watch history
   func clearWatchHistory() async throws

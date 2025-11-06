@@ -311,23 +311,10 @@ struct HomeFeature {
         state.watchHistory = history
         return .none
 
-      case .historyItemTapped(let entry):
-        // Fetch the content using the contentId from the entry
-        return .run { send in
-          do {
-            let contentRepository = await ContentRepository()
-            let content = try await contentRepository.fetchContentDetails(
-              id: entry.contentId,
-              type: nil
-            )
-            await send(.contentTapped(content))
-          } catch {
-            await AppLogger.shared.log(
-              "Failed to fetch content for history entry: \(error)",
-              level: .error
-            )
-          }
-        }
+      case .historyItemTapped(_):
+        // Navigation is handled at the parent (MainTabFeature) level.
+        // Do not perform any blocking work here to keep navigation snappy.
+        return .none
       }
     }
   }

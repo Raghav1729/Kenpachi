@@ -50,7 +50,7 @@ struct MySpaceView: View {
 
                     Spacer()
 
-                    Button("myspace.history.clear") {
+                    Button("myspace.clear") {
                       store.send(.clearWatchHistory)
                     }
                     .font(.labelMedium)
@@ -82,7 +82,12 @@ struct MySpaceView: View {
                       .foregroundColor(.textPrimary)
 
                     Spacer()
-                    
+                    Button("myspace.clear") {
+                      store.send(.clearWatchlist)
+                    }
+                    .font(.labelMedium)
+                    .foregroundColor(.primaryBlue)
+
                     Text("\(store.watchlist.count)")
                       .font(.labelMedium)
                       .foregroundColor(.textSecondary)

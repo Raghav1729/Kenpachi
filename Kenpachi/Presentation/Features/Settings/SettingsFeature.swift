@@ -76,6 +76,7 @@ struct SettingsFeature {
     var isLoadingSettings: Bool = false
     var isClearingCache: Bool = false
     var isClearingImageCache: Bool = false
+    var isClearingUserData: Bool = false
 
     /// Alert state
     @Presents var alert: AlertState<Action.Alert>?
@@ -144,6 +145,9 @@ struct SettingsFeature {
     case clearImageCacheTapped
     case clearImageCacheConfirmed
     case imageCacheCleared(Int64)
+    case clearUserDataTapped
+    case clearUserDataConfirmed
+    case userDataCleared
     case clearSearchHistoryTapped
     case searchHistoryCleared
 
@@ -165,6 +169,7 @@ struct SettingsFeature {
       case confirmClearCache
       case confirmClearImageCache
       case confirmClearSearchHistory
+      case confirmClearUserData
       case confirmSupport
     }
 
@@ -416,7 +421,7 @@ struct SettingsFeature {
         state.cacheSize = newSize
         state.totalStorageUsed -= clearedAmount
         print("✅ [Settings] Cache cleared: \(formatBytes(clearedAmount))")
-        return .none
+        return .send(.delegate(.settingsUpdated))
 
       case .clearImageCacheTapped:
         state.alert = AlertState {
@@ -450,6 +455,36 @@ struct SettingsFeature {
         state.totalStorageUsed -= clearedAmount
         print("✅ [Settings] Image cache cleared: \(formatBytes(clearedAmount))")
         return .none
+
+      case .clearUserDataTapped:
+        state.alert = AlertState {
+          TextState("Clear User Data")
+        } actions: {
+          ButtonState(role: .destructive, action: .confirmClearUserData) {
+            TextState("Clear")
+          }
+          ButtonState(role: .cancel) {
+            TextState("Cancel")
+          }
+        } message: {
+          TextState("This will remove your profile, watchlist, watch history, and search history.")
+        }
+        return .none
+
+      case .alert(.presented(.confirmClearUserData)):
+        return .send(.clearUserDataConfirmed)
+
+      case .clearUserDataConfirmed:
+        state.isClearingUserData = true
+        return .run { send in
+          await clearUserData()
+          await send(.userDataCleared)
+        }
+
+      case .userDataCleared:
+        state.isClearingUserData = false
+        print("✅ [Settings] User data cleared")
+        return .send(.delegate(.settingsUpdated))
 
       case .clearSearchHistoryTapped:
         return .run { send in
@@ -680,6 +715,12 @@ struct SettingsFeature {
   @MainActor
   private func clearSearchHistory() async {
     userDefaults.removeObject(forKey: UserDefaultsKeys.recentSearches)
+  }
+
+  /// Clear all user data (profile, watchlist, watch history, preferences, app state, search history)
+  @MainActor
+  private func clearUserData() async {
+    userDefaults.resetToDefaults()
   }
 
   /// Open support URL

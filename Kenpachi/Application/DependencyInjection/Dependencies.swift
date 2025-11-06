@@ -16,7 +16,7 @@ final class MockUserRepository {
   func isInWatchlist(contentId: String) async throws -> Bool { false }
   func fetchWatchHistory() async throws -> Any { () }
   func updateWatchHistoryEntry(_ entry: Any) async throws {}
-  func removeWatchHistoryEntry(id: String) async throws {}
+  func removeWatchHistoryEntry(contentId: String, contentType: ContentType) async throws {}
   func clearWatchHistory() async throws {}
   func getUserStatistics() async throws -> (
     watchTime: TimeInterval, contentCount: Int, favoriteGenres: [String]
@@ -86,6 +86,14 @@ public struct SendableUserDefaults: @unchecked Sendable {
 
   public func double(forKey defaultName: String) -> Double {
     userDefaults.double(forKey: defaultName)
+  }
+
+  /// Reset all values in UserDefaults for this app back to defaults (removes the persistent domain)
+  public func resetToDefaults() {
+    if let bundleID = Bundle.main.bundleIdentifier {
+      userDefaults.removePersistentDomain(forName: bundleID)
+      userDefaults.synchronize()
+    }
   }
 }
 

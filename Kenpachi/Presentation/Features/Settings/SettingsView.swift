@@ -386,6 +386,15 @@ struct SettingsView: View {
       ) {
         store.send(.clearImageCacheTapped)
       }
+
+      SettingsButtonRow(
+        icon: "trash.fill",
+        title: "Clear User Data",
+        style: .destructive,
+        isLoading: store.isClearingUserData
+      ) {
+        store.send(.clearUserDataTapped)
+      }
     }
   }
 

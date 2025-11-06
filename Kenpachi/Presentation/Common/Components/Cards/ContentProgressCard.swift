@@ -188,6 +188,7 @@ struct RoundedCorner: Shape {
         entry: WatchHistoryEntry(
           contentId: "movie-1",
           title: "Movie One",
+          contentType: .movie,
           scraperSource: "FlixHQ",
           fullPosterURL: URL(string: "https://image.tmdb.org/t/p/w500/example1.jpg"),
           progress: 0.25,
@@ -202,6 +203,7 @@ struct RoundedCorner: Shape {
         entry: WatchHistoryEntry(
           contentId: "show-2",
           title: "Sample Show - S01E02 - Second Episode",
+          contentType: .tvShow,
           episodeId: "S01E02",
           seasonNumber: 1,
           episodeNumber: 2,
@@ -219,6 +221,7 @@ struct RoundedCorner: Shape {
         entry: WatchHistoryEntry(
           contentId: "movie-3",
           title: "Movie Three",
+          contentType: .movie,
           scraperSource: "FlixHQ",
           fullPosterURL: URL(string: "https://image.tmdb.org/t/p/w500/example3.jpg"),
           progress: 0.45,
@@ -232,6 +235,7 @@ struct RoundedCorner: Shape {
         entry: WatchHistoryEntry(
           contentId: "show-4",
           title: "Sample Show - S02E05 - Fifth Episode",
+          contentType: .tvShow,
           episodeId: "S02E05",
           seasonNumber: 2,
           episodeNumber: 5,

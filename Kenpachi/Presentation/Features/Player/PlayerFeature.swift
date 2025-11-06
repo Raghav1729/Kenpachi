@@ -1,6 +1,6 @@
 // PlayerFeature.swift
-// YouTube style video player feature
-// Manages playback with clean, minimal controls
+// Disney Plus style video player feature
+// Landscape-only with advanced controls and gestures
 
 import AVFoundation
 import ComposableArchitecture
@@ -42,7 +42,7 @@ struct PlayerFeature {
     /// Playback speed
     var playbackSpeed: Float = 1.0
     /// Available playback speeds
-    var availablePlaybackSpeeds: [Float] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+    var availablePlaybackSpeeds: [Float] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
     /// Volume level
     var volume: Float = 1.0
     /// Is muted
@@ -106,7 +106,7 @@ struct PlayerFeature {
     case seekTo(TimeInterval)
     case skipForward(TimeInterval)
     case skipBackward(TimeInterval)
-    case performSeek(TimeInterval)  // Internal action for actual seeking
+    case performSeek(TimeInterval)
 
     /// Settings
     case playbackSpeedChanged(Float)
@@ -182,7 +182,6 @@ struct PlayerFeature {
         return .none
 
       case .seekTo(let time):
-        /// Clamp time to valid range
         let clampedTime = max(0, min(time, state.duration))
         state.currentTime = clampedTime
         state.isSeeking = false
@@ -199,18 +198,21 @@ struct PlayerFeature {
         return .none
 
       case .performSeek:
-        /// This action is handled in the view layer
         return .none
 
       case .playbackSpeedChanged(let speed):
         state.playbackSpeed = speed
         state.showSpeedMenu = false
         state.showSettings = false
+        // Ensure controls stay visible after changing speed
+        state.showControls = true
         return .none
 
       case .qualitySelected(let quality):
         state.selectedQuality = quality
         state.showSettings = false
+        // Ensure controls stay visible after changing quality
+        state.showControls = true
         if let link = state.streamingLinks.first(where: { $0.quality == quality }) {
           state.selectedLink = link
         }
@@ -237,6 +239,10 @@ struct PlayerFeature {
         state.showSpeedMenu = false
         state.showSourceMenu = false
         state.showSubtitleMenu = false
+        // Ensure controls stay visible when opening/closing menus
+        if !state.showSettings {
+          state.showControls = true
+        }
         return .none
 
       case .toggleSpeedMenu:
@@ -245,6 +251,10 @@ struct PlayerFeature {
         state.showSettings = false
         state.showSourceMenu = false
         state.showSubtitleMenu = false
+        // Ensure controls stay visible when opening/closing menus
+        if !state.showSpeedMenu {
+          state.showControls = true
+        }
         return .none
 
       case .toggleSourceMenu:
@@ -253,6 +263,10 @@ struct PlayerFeature {
         state.showSpeedMenu = false
         state.showSettings = false
         state.showSubtitleMenu = false
+        // Ensure controls stay visible when opening/closing menus
+        if !state.showSourceMenu {
+          state.showControls = true
+        }
         return .none
 
       case .toggleSubtitleMenu:
@@ -261,15 +275,20 @@ struct PlayerFeature {
         state.showSpeedMenu = false
         state.showSourceMenu = false
         state.showSettings = false
+        // Ensure controls stay visible when opening/closing menus
+        if !state.showSubtitleMenu {
+          state.showControls = true
+        }
         return .none
 
       case .subtitleSelected(let subtitle):
         state.selectedSubtitle = subtitle
         state.showSubtitleMenu = false
+        // Ensure controls stay visible after selecting subtitle
+        state.showControls = true
         return .none
 
       case .timeUpdated(let current, let duration):
-        /// Only update time if we're not actively seeking
         if !state.isSeeking {
           state.currentTime = current
         }
@@ -315,6 +334,8 @@ struct PlayerFeature {
         state.selectedLink = link
         state.selectedQuality = link.quality
         state.showSourceMenu = false
+        // Ensure controls stay visible after changing source
+        state.showControls = true
         
         // Update available subtitles when link changes
         if let subtitles = link.subtitles, !subtitles.isEmpty {
@@ -328,8 +349,6 @@ struct PlayerFeature {
         return .none
 
       case .airPlayTapped:
-        // AirPlay action is handled in the view layer through the AirPlayService
-        // This action can be used for analytics or state updates if needed
         return .none
 
       case .airPlayAvailabilityChanged(let isAvailable):
@@ -345,8 +364,6 @@ struct PlayerFeature {
         return .none
 
       case .pipTapped:
-        // PiP action is handled in the view layer through the PictureInPictureService
-        // This action can be used for analytics or state updates if needed
         return .none
 
       case .pipStateChanged(let isActive, let isPossible, let isSupported):

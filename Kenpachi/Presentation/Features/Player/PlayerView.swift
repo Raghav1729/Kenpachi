@@ -1,6 +1,6 @@
 // PlayerView.swift
-// YouTube style video player
-// Clean, minimal design with smooth animations and modern controls
+// Disney Plus style video player
+// Landscape-only with fullscreen controls, PiP, AirPlay, subtitles, and advanced gestures
 
 import AVKit
 import Combine
@@ -15,41 +15,73 @@ struct PlayerView: View {
   @State private var playerLayer: AVPlayerLayer?
   @State private var controlsTimer: Timer?
   @State private var cancellables = Set<AnyCancellable>()
-  @State private var lastSeekTime: TimeInterval = 0
-  @State private var shouldSeek = false
-  @State private var isMinimized = false
-
+  
   // Services
   @StateObject private var airPlayService = AirPlayService()
   @StateObject private var pipService = PictureInPictureService()
+  
+  // Gesture states
+  @State private var dragOffset: CGSize = .zero
+  @State private var lastBrightness: CGFloat = 0.5
+  @State private var isAdjustingBrightness = false
+  @State private var currentScale: CGFloat = 1.0
+  @State private var lastScale: CGFloat = 1.0
+  @State private var currentBrightness: CGFloat = 0.5
 
   var body: some View {
-    WithViewStore(store, observe: { $0 }) { viewStore in
+    WithViewStore(store, observe: \.self) { viewStore in
       ZStack {
         Color.black.ignoresSafeArea()
 
-        /// Video player
+        // Video player
         if let player = player {
-          YouTubeStyleVideoPlayer(
+          DisneyPlusVideoPlayer(
             player: player,
+            scale: currentScale,
             onPlayerLayerReady: { layer in
               playerLayer = layer
               setupPiP(with: layer, viewStore: viewStore)
             }
           )
           .ignoresSafeArea()
-          .overlay(
-            /// Transparent tap area to capture gestures
-            Color.clear
-              .contentShape(Rectangle())
-              .onTapGesture {
-                _ = withAnimation(.easeInOut(duration: 0.25)) {
-                  viewStore.send(.toggleControls)
-                }
-                if viewStore.showControls {
-                  resetControlsTimer(viewStore: viewStore)
-                }
+          .highPriorityGesture(
+            // Double tap left to skip backward
+            TapGesture(count: 2)
+              .onEnded { _ in
+                let newTime = max(viewStore.currentTime - 10, 0)
+                viewStore.send(.skipBackward(10))
+                seekPlayer(to: newTime)
+              },
+            including: .subviews
+          )
+          .gesture(
+            // Pinch to zoom
+            MagnificationGesture()
+              .onChanged { value in
+                currentScale = min(max(lastScale * value, 1.0), 3.0)
               }
+              .onEnded { _ in
+                lastScale = currentScale
+              }
+          )
+          .overlay(
+            // Drag gesture overlay for brightness control
+            GeometryReader { geometry in
+              Color.clear
+                .contentShape(Rectangle())
+                .gesture(
+                  DragGesture(minimumDistance: 20)
+                    .onChanged { value in
+                      if !viewStore.isSeeking {
+                        handleDragGesture(value: value, geometry: geometry, viewStore: viewStore)
+                      }
+                    }
+                    .onEnded { _ in
+                      isAdjustingBrightness = false
+                      dragOffset = .zero
+                    }
+                )
+            }
           )
         } else if viewStore.isLoading {
           ProgressView()
@@ -57,56 +89,73 @@ struct PlayerView: View {
             .scaleEffect(1.5)
         }
 
-        /// Buffering indicator
+        // Buffering indicator
         if viewStore.isBuffering {
           ProgressView()
             .tint(.white)
             .scaleEffect(1.2)
         }
+        
+        // Brightness indicator
+        if isAdjustingBrightness {
+          BrightnessIndicator(brightness: currentBrightness)
+            .transition(.opacity)
+        }
 
-        /// Controls overlay
+        // Controls overlay
         if viewStore.showControls {
-          YouTubeStylePlayerControls(
+          DisneyPlusPlayerControls(
             store: store,
             airPlayService: airPlayService,
             pipService: pipService,
             onDismiss: { dismiss() },
-            onSeek: { time in
-              seekPlayer(to: time)
-            }
+            onSeek: { time in seekPlayer(to: time) }
           )
           .transition(.opacity)
         }
 
-        /// Settings panel
+        // Settings panel
         if viewStore.showSettings {
-          YouTubeStyleSettingsPanel(store: store)
+          DisneyPlusSettingsPanel(store: store)
             .transition(.move(edge: .trailing).combined(with: .opacity))
         }
 
-        /// Speed menu
+        // Speed menu
         if viewStore.showSpeedMenu {
-          YouTubeStyleSpeedMenu(store: store)
+          DisneyPlusSpeedMenu(store: store)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
 
-        /// Source selection menu
+        // Source selection menu
         if viewStore.showSourceMenu {
-          YouTubeStyleSourceMenu(store: store)
+          DisneyPlusSourceMenu(store: store)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
 
-        /// Subtitle selection menu
+        // Subtitle selection menu
         if viewStore.showSubtitleMenu {
-          YouTubeStyleSubtitleMenu(store: store)
+          DisneyPlusSubtitleMenu(store: store)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
 
-        /// Error overlay
+        // Error overlay
         if let error = viewStore.errorMessage {
           ErrorOverlay(message: error, onDismiss: { dismiss() })
         }
       }
+      // Make taps anywhere on the player surface show controls and reset timer
+      .contentShape(Rectangle())
+      .simultaneousGesture(
+        TapGesture()
+          .onEnded {
+            if !viewStore.showControls {
+              _ = withAnimation(.easeInOut(duration: 0.25)) {
+                viewStore.send(.toggleControls)
+              }
+            }
+            resetControlsTimer(viewStore: viewStore)
+          }
+      )
       .statusBar(hidden: true)
       .persistentSystemOverlays(.hidden)
       .onAppear {
@@ -115,8 +164,6 @@ struct PlayerView: View {
         setupPlayer(viewStore: viewStore)
         setupServices(viewStore: viewStore)
         resetControlsTimer(viewStore: viewStore)
-
-        // Setup app lifecycle notifications for PiP
         setupAppLifecycleObservers(viewStore: viewStore)
       }
       .onDisappear {
@@ -146,9 +193,25 @@ struct PlayerView: View {
       }
     }
   }
+  
+  // MARK: - Gesture Handlers
+  
+  private func handleDragGesture(value: DragGesture.Value, geometry: GeometryProxy, viewStore: ViewStoreOf<PlayerFeature>) {
+    // Brightness control on vertical swipe
+    isAdjustingBrightness = true
+    let delta = -value.translation.height / 300
+    let newBrightness = min(max(lastBrightness + delta, 0), 1)
+    currentBrightness = newBrightness
+    // Set brightness on main screen if available
+    if let screen = UIApplication.shared.connectedScenes
+      .compactMap({ $0 as? UIWindowScene })
+      .first?.screen {
+      screen.brightness = newBrightness
+    }
+  }
 
-  /// Performs seek on the player
-  /// - Parameter time: Target time in seconds
+  // MARK: - Player Setup
+  
   private func seekPlayer(to time: TimeInterval) {
     guard let player = player else { return }
     let cmTime = CMTime(seconds: time, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
@@ -163,7 +226,6 @@ struct PlayerView: View {
       return
     }
 
-    // Configure audio session for AirPlay and PiP
     configureAudioSession()
 
     var asset = AVURLAsset(url: url)
@@ -178,16 +240,13 @@ struct PlayerView: View {
 
     let interval = CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
     newPlayer.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
-
       let current = time.seconds
       var duration = playerItem.duration.seconds
 
-      // Handle live streams or unknown duration
       if duration.isNaN || duration.isInfinite {
         duration = 0
       }
 
-      // Only update if we have valid time values
       if !current.isNaN && !current.isInfinite && current >= 0 {
         viewStore.send(.timeUpdated(current: current, duration: max(duration, 0)))
       }
@@ -205,7 +264,6 @@ struct PlayerView: View {
       .sink { status in
         switch status {
         case .readyToPlay:
-          // Player is ready, update duration if available
           let duration = playerItem.duration.seconds
           if !duration.isNaN && !duration.isInfinite && duration > 0 {
             viewStore.send(.timeUpdated(current: 0, duration: duration))
@@ -220,7 +278,6 @@ struct PlayerView: View {
       }
       .store(in: &cancellables)
 
-    // Observe duration changes
     playerItem.publisher(for: \.duration)
       .sink { duration in
         let durationSeconds = duration.seconds
@@ -232,12 +289,17 @@ struct PlayerView: View {
       .store(in: &cancellables)
 
     self.player = newPlayer
-
-    // Update AirPlay service with new player
     airPlayService.setPlayer(newPlayer)
-
     newPlayer.play()
     viewStore.send(.playbackStateChanged(true))
+    
+    // Store initial brightness
+    if let screen = UIApplication.shared.connectedScenes
+      .compactMap({ $0 as? UIWindowScene })
+      .first?.screen {
+      lastBrightness = screen.brightness
+      currentBrightness = screen.brightness
+    }
   }
 
   private func updatePlayerItem(with link: ExtractedLink) {
@@ -251,7 +313,6 @@ struct PlayerView: View {
     let playerItem = AVPlayerItem(asset: asset)
     player?.replaceCurrentItem(with: playerItem)
 
-    // Update AirPlay service with the new player item
     if let player = player {
       airPlayService.setPlayer(player)
     }
@@ -268,11 +329,9 @@ struct PlayerView: View {
   }
 
   private func setupServices(viewStore: ViewStoreOf<PlayerFeature>) {
-    // Setup AirPlay service
     if let player = player {
       airPlayService.setPlayer(player)
 
-      // Monitor AirPlay state changes
       airPlayService.$isAirPlayAvailable
         .receive(on: DispatchQueue.main)
         .sink { isAvailable in
@@ -295,16 +354,13 @@ struct PlayerView: View {
         .store(in: &cancellables)
     }
 
-    // Setup PiP callbacks
     pipService.setCallbacks(
       onWillStart: {
-        // Hide controls when PiP starts
         if viewStore.showControls {
           viewStore.send(.toggleControls)
         }
       },
       onDidStart: {
-        // Update state
         viewStore.send(
           .pipStateChanged(
             isActive: true,
@@ -313,7 +369,6 @@ struct PlayerView: View {
           ))
       },
       onDidStop: {
-        // Update state
         viewStore.send(
           .pipStateChanged(
             isActive: false,
@@ -322,14 +377,12 @@ struct PlayerView: View {
           ))
       },
       onRestoreUserInterface: {
-        // Show controls when returning from PiP
         if !viewStore.showControls {
           viewStore.send(.toggleControls)
         }
       }
     )
 
-    // Monitor PiP service state changes
     pipService.$isPiPSupported
       .combineLatest(pipService.$isPiPPossible, pipService.$isPiPActive)
       .receive(on: DispatchQueue.main)
@@ -345,11 +398,8 @@ struct PlayerView: View {
   }
 
   private func setupPiP(with layer: AVPlayerLayer, viewStore: ViewStoreOf<PlayerFeature>) {
-    // Setup PiP with error handling
     do {
       pipService.setupPiP(with: layer)
-
-      // Update initial PiP state
       viewStore.send(
         .pipStateChanged(
           isActive: pipService.isPiPActive,
@@ -388,7 +438,6 @@ struct PlayerView: View {
       let currentItem = player.currentItem
     else { return }
 
-    // Disable all current subtitle tracks using async loading
     let asset = currentItem.asset
     Task {
       if let characteristics = try? await asset.load(
@@ -404,23 +453,18 @@ struct PlayerView: View {
       }
     }
 
-    // If subtitle is nil or "none", keep subtitles disabled
     guard let subtitle = subtitle,
       subtitle.id != "none",
       !subtitle.url.isEmpty
     else { return }
 
-    // For now, we'll handle subtitle loading in a future implementation
-    // This would involve loading external subtitle files and applying them
     print("Selected subtitle: \(subtitle.name) (\(subtitle.language))")
   }
 
   private func setupAppLifecycleObservers(viewStore: ViewStoreOf<PlayerFeature>) {
-    // Observe app entering background for automatic PiP
     NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
       .receive(on: DispatchQueue.main)
       .sink { _ in
-        // Automatically start PiP when app goes to background if possible
         if viewStore.isPiPSupported && viewStore.isPiPPossible && !viewStore.isPiPActive
           && viewStore.isPlaying
         {
@@ -429,11 +473,9 @@ struct PlayerView: View {
       }
       .store(in: &cancellables)
 
-    // Observe app becoming active
     NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
       .receive(on: DispatchQueue.main)
       .sink { _ in
-        // Update states when app becomes active
         viewStore.send(
           .pipStateChanged(
             isActive: pipService.isPiPActive,
@@ -448,8 +490,12 @@ struct PlayerView: View {
     controlsTimer?.invalidate()
     guard viewStore.isPlaying else { return }
 
-    controlsTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { _ in
-      if viewStore.isPlaying && viewStore.showControls {
+    controlsTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
+      // Don't hide controls if any menu is open
+      let hasOpenMenu = viewStore.showSettings || viewStore.showSpeedMenu || 
+                        viewStore.showSourceMenu || viewStore.showSubtitleMenu
+      
+      if viewStore.isPlaying && viewStore.showControls && !hasOpenMenu {
         _ = withAnimation(.easeInOut(duration: 0.25)) {
           viewStore.send(.toggleControls)
         }
@@ -478,9 +524,10 @@ extension UIInterfaceOrientation {
   }
 }
 
-// MARK: - YouTube Style Video Player
-struct YouTubeStyleVideoPlayer: UIViewRepresentable {
+// MARK: - Disney Plus Video Player
+struct DisneyPlusVideoPlayer: UIViewRepresentable {
   let player: AVPlayer
+  let scale: CGFloat
   let onPlayerLayerReady: (AVPlayerLayer) -> Void
 
   func makeUIView(context: Context) -> UIView {
@@ -493,7 +540,6 @@ struct YouTubeStyleVideoPlayer: UIViewRepresentable {
 
     view.layer.addSublayer(playerLayer)
 
-    // Notify that player layer is ready
     DispatchQueue.main.async {
       onPlayerLayerReady(playerLayer)
     }
@@ -504,12 +550,44 @@ struct YouTubeStyleVideoPlayer: UIViewRepresentable {
   func updateUIView(_ uiView: UIView, context: Context) {
     if let playerLayer = uiView.layer.sublayers?.first as? AVPlayerLayer {
       playerLayer.frame = uiView.bounds
+      
+      // Apply zoom transform
+      CATransaction.begin()
+      CATransaction.setDisableActions(true)
+      playerLayer.transform = CATransform3DMakeScale(scale, scale, 1)
+      CATransaction.commit()
     }
   }
 }
 
-// MARK: - YouTube Style Player Controls
-struct YouTubeStylePlayerControls: View {
+// MARK: - Brightness Indicator
+struct BrightnessIndicator: View {
+  let brightness: CGFloat
+  
+  var body: some View {
+    VStack(spacing: 12) {
+      Image(systemName: "sun.max.fill")
+        .font(.system(size: 24))
+        .foregroundColor(.white)
+      
+      ProgressView(value: brightness, total: 1.0)
+        .progressViewStyle(LinearProgressViewStyle(tint: .white))
+        .frame(width: 150)
+      
+      Text("\(Int(brightness * 100))%")
+        .font(.caption)
+        .foregroundColor(.white)
+    }
+    .padding(20)
+    .background(
+      RoundedRectangle(cornerRadius: 12)
+        .fill(Color.black.opacity(0.8))
+    )
+  }
+}
+
+// MARK: - Disney Plus Player Controls
+struct DisneyPlusPlayerControls: View {
   let store: StoreOf<PlayerFeature>
   let airPlayService: AirPlayService
   let pipService: PictureInPictureService
@@ -517,98 +595,119 @@ struct YouTubeStylePlayerControls: View {
   let onSeek: (TimeInterval) -> Void
 
   var body: some View {
-    WithViewStore(store, observe: { $0 }) { viewStore in
+    WithViewStore(self.store, observe: \.self) { viewStore in
       VStack(spacing: 0) {
-        /// Top bar with dismiss button and title
-        HStack {
+        // Top bar
+        HStack(spacing: 16) {
           Button(action: onDismiss) {
-            Image(systemName: "chevron.left")
-              .font(.title2)
-              .foregroundColor(.white)
-              .frame(width: 44, height: 44)
+            HStack(spacing: 8) {
+              Image(systemName: "chevron.left")
+                .font(.system(size: 20, weight: .semibold))
+              Text("Back")
+                .font(.system(size: 16, weight: .medium))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+              Capsule()
+                .fill(Color.white.opacity(0.2))
+            )
           }
 
           Spacer()
 
-          Text(viewStore.content.title)
-            .font(.headline)
-            .foregroundColor(.white)
-            .lineLimit(1)
-            .padding(.trailing, 20)
+          VStack(alignment: .trailing, spacing: 2) {
+            Text(viewStore.content.title)
+              .font(.system(size: 16, weight: .semibold))
+              .foregroundColor(.white)
+              .lineLimit(1)
+            
+            if let episode = viewStore.episode {
+              Text("S\(String(format: "%02d", episode.seasonNumber))E\(String(format: "%02d", episode.episodeNumber)) - \(episode.name)")
+                .font(.system(size: 13))
+                .foregroundColor(.white.opacity(0.8))
+                .lineLimit(1)
+            }
+          }
         }
         .padding(.horizontal, 20)
         .padding(.top, 16)
         .background(
           LinearGradient(
-            colors: [.black.opacity(0.8), .clear],
+            colors: [.black.opacity(0.7), .clear],
             startPoint: .top,
             endPoint: .bottom
           )
-          .frame(height: 120)
+          .frame(height: 100)
         )
 
         Spacer()
 
-        /// Center controls with YouTube-style play/pause button
-        HStack(spacing: 60) {
-          // Skip backward button
+        // Center controls
+        HStack(spacing: 50) {
+          // Skip backward 10 seconds
           Button {
             let newTime = max(viewStore.currentTime - 10, 0)
             viewStore.send(.skipBackward(10))
             onSeek(newTime)
           } label: {
-            ZStack {
-              Circle()
-                .fill(Color.black.opacity(0.5))
-                .frame(width: 50, height: 50)
-
-              Image(systemName: "gobackward.10")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundColor(.white)
+            VStack(spacing: 8) {
+              ZStack {
+                Circle()
+                  .fill(Color.white.opacity(0.15))
+                  .frame(width: 60, height: 60)
+                
+                Image(systemName: "gobackward.10")
+                  .font(.system(size: 24, weight: .medium))
+                  .foregroundColor(.white)
+              }
             }
           }
 
-          // Play/Pause button with YouTube-style design
+          // Play/Pause
           Button {
             viewStore.send(.playPauseTapped)
           } label: {
             ZStack {
               Circle()
-                .fill(Color.white.opacity(0.9))
-                .frame(width: 70, height: 70)
-
+                .fill(Color.white)
+                .frame(width: 80, height: 80)
+              
               Image(systemName: viewStore.isPlaying ? "pause.fill" : "play.fill")
-                .font(.system(size: 28, weight: .medium))
+                .font(.system(size: 32, weight: .bold))
                 .foregroundColor(.black)
-                .offset(x: viewStore.isPlaying ? 0 : 2)  // Slight offset for play icon
+                .offset(x: viewStore.isPlaying ? 0 : 3)
             }
           }
 
-          // Skip forward button
+          // Skip forward 30 seconds
           Button {
-            let newTime = min(viewStore.currentTime + 10, viewStore.duration)
-            viewStore.send(.skipForward(10))
+            let newTime = min(viewStore.currentTime + 30, viewStore.duration)
+            viewStore.send(.skipForward(30))
             onSeek(newTime)
           } label: {
-            ZStack {
-              Circle()
-                .fill(Color.black.opacity(0.5))
-                .frame(width: 50, height: 50)
-
-              Image(systemName: "goforward.10")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundColor(.white)
+            VStack(spacing: 8) {
+              ZStack {
+                Circle()
+                  .fill(Color.white.opacity(0.15))
+                  .frame(width: 60, height: 60)
+                
+                Image(systemName: "goforward.30")
+                  .font(.system(size: 24, weight: .medium))
+                  .foregroundColor(.white)
+              }
             }
           }
         }
 
         Spacer()
 
-        /// Bottom bar with progress bar and controls
-        VStack(spacing: 16) {
-          /// Progress bar with time
+        // Bottom bar
+        VStack(spacing: 12) {
+          // Progress bar
           VStack(spacing: 8) {
-            YouTubeStyleProgressBar(
+            DisneyPlusProgressBar(
               currentTime: viewStore.currentTime,
               duration: viewStore.duration,
               onSeek: { time in
@@ -620,101 +719,59 @@ struct YouTubeStylePlayerControls: View {
 
             HStack {
               Text(formatTime(viewStore.currentTime))
-                .font(.caption)
+                .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.white)
                 .monospacedDigit()
 
               Spacer()
 
               Text(formatTime(viewStore.duration))
-                .font(.caption)
-                .foregroundColor(.white)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
                 .monospacedDigit()
             }
           }
 
-          /// Bottom action buttons in YouTube style
-          HStack(spacing: 25) {
-            /// Episodes button
-            if viewStore.episode != nil {
-              Button {
-                // Handle episodes
-              } label: {
-                VStack(spacing: 4) {
-                  Image(systemName: "list.bullet")
-                    .font(.title2)
-                    .foregroundColor(.white)
-                }
-              }
-            }
-
-            /// Stream Selection (show when multiple streams available)
+          // Control buttons
+          HStack(spacing: 20) {
+            // Source selection
             if viewStore.streamingLinks.count > 1 {
-              Button {
+              ControlButton(
+                icon: "antenna.radiowaves.left.and.right",
+                label: viewStore.selectedLink?.server ?? "Source",
+                isActive: viewStore.showSourceMenu
+              ) {
                 viewStore.send(.toggleSourceMenu)
-              } label: {
-                VStack(spacing: 4) {
-                  Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.title2)
-                    .foregroundColor(viewStore.showSourceMenu ? .red : .white)
-
-                  if let selectedLink = viewStore.selectedLink {
-                    Text(selectedLink.server)
-                      .font(.caption2)
-                      .foregroundColor(
-                        viewStore.showSourceMenu ? .red.opacity(0.8) : .white.opacity(0.8)
-                      )
-                      .lineLimit(1)
-                  }
-                }
               }
             }
 
-            /// Subtitles button
+            // Subtitles
             if !viewStore.availableSubtitles.isEmpty {
-              Button {
+              ControlButton(
+                icon: "captions.bubble",
+                label: viewStore.selectedSubtitle?.language.uppercased() ?? "CC",
+                isActive: viewStore.showSubtitleMenu || (viewStore.selectedSubtitle?.id != "none")
+              ) {
                 viewStore.send(.toggleSubtitleMenu)
-              } label: {
-                VStack(spacing: 4) {
-                  Image(systemName: "captions.bubble")
-                    .font(.title2)
-                    .foregroundColor(viewStore.showSubtitleMenu ? .red : .white)
-
-                  if let selectedSubtitle = viewStore.selectedSubtitle,
-                    selectedSubtitle.id != "none"
-                  {
-                    Text(selectedSubtitle.language.uppercased())
-                      .font(.caption2)
-                      .foregroundColor(
-                        viewStore.showSubtitleMenu ? .red.opacity(0.8) : .white.opacity(0.8)
-                      )
-                      .lineLimit(1)
-                  }
-                }
               }
             }
 
-            /// Speed button
-            Button {
+            // Speed
+            ControlButton(
+              icon: "speedometer",
+              label: String(format: "%.1fx", viewStore.playbackSpeed),
+              isActive: viewStore.showSpeedMenu
+            ) {
               viewStore.send(.toggleSpeedMenu)
-            } label: {
-              VStack(spacing: 4) {
-                Image(systemName: "speedometer")
-                  .font(.title2)
-                  .foregroundColor(viewStore.showSpeedMenu ? .red : .white)
-
-                Text("\(String(format: "%.1fx", viewStore.playbackSpeed))")
-                  .font(.caption2)
-                  .foregroundColor(
-                    viewStore.showSpeedMenu ? .red.opacity(0.8) : .white.opacity(0.8))
-              }
             }
 
-            /// AirPlay button
-            ModernAirPlayButton(isActive: viewStore.isCasting)
-              .frame(width: 44, height: 44)
+            // AirPlay
+            ZStack {
+              ModernAirPlayButton(isActive: viewStore.isCasting)
+                .frame(width: 40, height: 40)
+            }
 
-            /// Picture-in-Picture button
+            // Picture-in-Picture
             if viewStore.isPiPSupported {
               Button {
                 viewStore.send(.pipTapped)
@@ -725,31 +782,31 @@ struct YouTubeStylePlayerControls: View {
                 }
               } label: {
                 Image(systemName: viewStore.isPiPActive ? "pip.exit" : "pip.enter")
-                  .font(.title2)
+                  .font(.system(size: 20))
                   .foregroundColor(
-                    viewStore.isPiPActive ? .red : (viewStore.isPiPPossible ? .white : .gray)
+                    viewStore.isPiPActive ? .blue : (viewStore.isPiPPossible ? .white : .gray)
                   )
-                  .frame(width: 44, height: 44)
+                  .frame(width: 40, height: 40)
               }
               .disabled(!viewStore.isPiPPossible)
             }
 
-            /// Settings button
-            Button {
+            // Settings
+            ControlButton(
+              icon: "gearshape.fill",
+              label: nil,
+              isActive: viewStore.showSettings
+            ) {
               viewStore.send(.toggleSettings)
-            } label: {
-              Image(systemName: "gear")
-                .font(.title2)
-                .foregroundColor(viewStore.showSettings ? .red : .white)
-                .frame(width: 44, height: 44)
             }
           }
-          .padding(.horizontal)
+          .padding(.horizontal, 4)
         }
+        .padding(.horizontal, 20)
         .padding(.bottom, 20)
         .background(
           LinearGradient(
-            colors: [.clear, .black.opacity(0.8)],
+            colors: [.clear, .black.opacity(0.7)],
             startPoint: .top,
             endPoint: .bottom
           )
@@ -770,8 +827,34 @@ struct YouTubeStylePlayerControls: View {
   }
 }
 
-// MARK: - YouTube Style Progress Bar
-struct YouTubeStyleProgressBar: View {
+// MARK: - Control Button
+struct ControlButton: View {
+  let icon: String
+  let label: String?
+  let isActive: Bool
+  let action: () -> Void
+  
+  var body: some View {
+    Button(action: action) {
+      VStack(spacing: 4) {
+        Image(systemName: icon)
+          .font(.system(size: 20))
+          .foregroundColor(isActive ? .blue : .white)
+          .frame(width: 40, height: 40)
+        
+        if let label = label {
+          Text(label)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundColor(isActive ? .blue : .white.opacity(0.8))
+            .lineLimit(1)
+        }
+      }
+    }
+  }
+}
+
+// MARK: - Disney Plus Progress Bar
+struct DisneyPlusProgressBar: View {
   let currentTime: TimeInterval
   let duration: TimeInterval
   let onSeek: (TimeInterval) -> Void
@@ -783,23 +866,22 @@ struct YouTubeStyleProgressBar: View {
   var body: some View {
     GeometryReader { geometry in
       ZStack(alignment: .leading) {
-        /// Background track
+        // Background track
         Capsule()
           .fill(Color.white.opacity(0.3))
-          .frame(height: 3)
+          .frame(height: isDragging ? 6 : 4)
 
-        /// Progress
+        // Progress
         Capsule()
-          .fill(Color.red)
-          .frame(width: progressWidth(in: geometry.size.width), height: 3)
+          .fill(Color.blue)
+          .frame(width: progressWidth(in: geometry.size.width), height: isDragging ? 6 : 4)
 
-        /// Thumb
+        // Thumb
         Circle()
           .fill(Color.white)
-          .frame(width: isDragging ? 20 : 12, height: isDragging ? 20 : 12)
-          .offset(x: progressWidth(in: geometry.size.width) - (isDragging ? 10 : 6))
-          .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-          .opacity(isDragging || currentTime > 0 ? 1 : 0)
+          .frame(width: isDragging ? 18 : 0, height: isDragging ? 18 : 0)
+          .offset(x: progressWidth(in: geometry.size.width) - (isDragging ? 9 : 0))
+          .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
       }
       .animation(.easeOut(duration: 0.2), value: isDragging)
       .gesture(
@@ -830,20 +912,20 @@ struct YouTubeStyleProgressBar: View {
   }
 }
 
-// MARK: - YouTube Style Settings Panel
-struct YouTubeStyleSettingsPanel: View {
+// MARK: - Disney Plus Settings Panel
+struct DisneyPlusSettingsPanel: View {
   let store: StoreOf<PlayerFeature>
 
   var body: some View {
-    WithViewStore(store, observe: { $0 }) { viewStore in
+    WithViewStore(self.store, observe: { (state: PlayerFeature.State) in state }) { viewStore in
       HStack {
         Spacer()
 
         VStack(spacing: 0) {
-          /// Header
+          // Header
           HStack {
             Text("Settings")
-              .font(.headline)
+              .font(.system(size: 18, weight: .bold))
               .foregroundColor(.white)
 
             Spacer()
@@ -851,19 +933,20 @@ struct YouTubeStyleSettingsPanel: View {
             Button {
               viewStore.send(.toggleSettings)
             } label: {
-              Image(systemName: "xmark")
-                .foregroundColor(.white)
+              Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 24))
+                .foregroundColor(.white.opacity(0.6))
             }
           }
           .padding()
-          .background(Color.black.opacity(0.95))
+          .background(Color(white: 0.15))
 
           ScrollView {
             VStack(spacing: 0) {
-              /// Playback Speed
+              // Playback Speed
               PlayerSettingsSection(title: "Playback Speed") {
                 ForEach(viewStore.availablePlaybackSpeeds, id: \.self) { speed in
-                  SettingsButton(
+                  PlayerSettingsRow(
                     title: speed == 1.0 ? "Normal" : "\(String(format: "%.2fx", speed))",
                     isSelected: speed == viewStore.playbackSpeed
                   ) {
@@ -872,11 +955,11 @@ struct YouTubeStyleSettingsPanel: View {
                 }
               }
 
-              /// Quality
+              // Quality
               if !viewStore.availableQualities.isEmpty {
                 PlayerSettingsSection(title: "Quality") {
                   ForEach(viewStore.availableQualities, id: \.self) { quality in
-                    SettingsButton(
+                    PlayerSettingsRow(
                       title: quality,
                       isSelected: quality == viewStore.selectedQuality
                     ) {
@@ -886,9 +969,9 @@ struct YouTubeStyleSettingsPanel: View {
                 }
               }
 
-              /// Audio
+              // Audio
               PlayerSettingsSection(title: "Audio") {
-                SettingsButton(
+                PlayerSettingsRow(
                   title: viewStore.isMuted ? "Unmute" : "Mute",
                   isSelected: viewStore.isMuted
                 ) {
@@ -898,32 +981,81 @@ struct YouTubeStyleSettingsPanel: View {
             }
           }
         }
-        .frame(width: 280)
-        .background(
-          RoundedRectangle(cornerRadius: 16)
-            .fill(Color.black.opacity(0.95))
-            .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
-        )
+        .frame(width: 300)
+        .background(Color(white: 0.1))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.5), radius: 20, x: 0, y: 10)
         .padding()
       }
     }
   }
 }
 
-// MARK: - YouTube Style Speed Menu
-struct YouTubeStyleSpeedMenu: View {
+// MARK: - Player Settings Section
+struct PlayerSettingsSection<Content: View>: View {
+  let title: String
+  @ViewBuilder let content: Content
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text(title)
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundColor(.white.opacity(0.6))
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
+
+      content
+      
+      Divider()
+        .background(Color.white.opacity(0.1))
+        .padding(.top, 8)
+    }
+  }
+}
+
+// MARK: - Player Settings Row
+struct PlayerSettingsRow: View {
+  let title: String
+  let isSelected: Bool
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack {
+        Text(title)
+          .font(.system(size: 15))
+          .foregroundColor(.white)
+
+        Spacer()
+
+        if isSelected {
+          Image(systemName: "checkmark")
+            .font(.system(size: 14, weight: .bold))
+            .foregroundColor(.blue)
+        }
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 12)
+      .background(isSelected ? Color.white.opacity(0.1) : Color.clear)
+    }
+  }
+}
+
+// MARK: - Disney Plus Speed Menu
+struct DisneyPlusSpeedMenu: View {
   let store: StoreOf<PlayerFeature>
 
   var body: some View {
-    WithViewStore(store, observe: { $0 }) { viewStore in
+    WithViewStore(self.store, observe: { (state: PlayerFeature.State) in state }) { viewStore in
       VStack {
         Spacer()
 
         VStack(spacing: 0) {
-          /// Header
+          // Header
           HStack {
-            Text("Speed")
-              .font(.headline)
+            Text("Playback Speed")
+              .font(.system(size: 18, weight: .bold))
               .foregroundColor(.white)
 
             Spacer()
@@ -931,15 +1063,16 @@ struct YouTubeStyleSpeedMenu: View {
             Button {
               viewStore.send(.toggleSpeedMenu)
             } label: {
-              Image(systemName: "xmark")
-                .foregroundColor(.white)
+              Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 24))
+                .foregroundColor(.white.opacity(0.6))
             }
           }
           .padding()
-          .background(Color.black.opacity(0.95))
+          .background(Color(white: 0.15))
 
-          /// Speed options
-          LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 16) {
+          // Speed options
+          LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 12) {
             ForEach(viewStore.availablePlaybackSpeeds, id: \.self) { speed in
               Button {
                 viewStore.send(.playbackSpeedChanged(speed))
@@ -947,57 +1080,55 @@ struct YouTubeStyleSpeedMenu: View {
               } label: {
                 VStack(spacing: 8) {
                   Text(speed == 1.0 ? "Normal" : "\(String(format: "%.2fx", speed))")
-                    .font(.headline)
-                    .foregroundColor(speed == viewStore.playbackSpeed ? .red : .white)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(speed == viewStore.playbackSpeed ? .blue : .white)
 
                   if speed == viewStore.playbackSpeed {
                     Circle()
-                      .fill(Color.red)
-                      .frame(width: 8, height: 8)
+                      .fill(Color.blue)
+                      .frame(width: 6, height: 6)
                   } else {
                     Circle()
                       .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                      .frame(width: 8, height: 8)
+                      .frame(width: 6, height: 6)
                   }
                 }
-                .padding(.vertical, 16)
                 .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
                 .background(
-                  RoundedRectangle(cornerRadius: 12)
+                  RoundedRectangle(cornerRadius: 8)
                     .fill(
                       speed == viewStore.playbackSpeed
-                        ? Color.red.opacity(0.2) : Color.white.opacity(0.1))
+                        ? Color.blue.opacity(0.2) : Color.white.opacity(0.05))
                 )
               }
             }
           }
           .padding()
         }
-        .background(
-          RoundedRectangle(cornerRadius: 16)
-            .fill(Color.black.opacity(0.95))
-            .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: -5)
-        )
+        .background(Color(white: 0.1))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.5), radius: 20, x: 0, y: -10)
         .padding()
       }
     }
   }
 }
 
-// MARK: - YouTube Style Source Menu
-struct YouTubeStyleSourceMenu: View {
+// MARK: - Disney Plus Source Menu
+struct DisneyPlusSourceMenu: View {
   let store: StoreOf<PlayerFeature>
 
   var body: some View {
-    WithViewStore(store, observe: { $0 }) { viewStore in
+    WithViewStore(self.store, observe: { (state: PlayerFeature.State) in state }) { viewStore in
       VStack {
         Spacer()
 
         VStack(spacing: 0) {
-          /// Header
+          // Header
           HStack {
-            Text("Sources")
-              .font(.headline)
+            Text("Video Source")
+              .font(.system(size: 18, weight: .bold))
               .foregroundColor(.white)
 
             Spacer()
@@ -1005,50 +1136,51 @@ struct YouTubeStyleSourceMenu: View {
             Button {
               viewStore.send(.toggleSourceMenu)
             } label: {
-              Image(systemName: "xmark")
-                .foregroundColor(.white)
+              Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 24))
+                .foregroundColor(.white.opacity(0.6))
             }
           }
           .padding()
-          .background(Color.black.opacity(0.95))
+          .background(Color(white: 0.15))
 
-          /// Source options
+          // Source options
           ScrollView {
-            LazyVStack(spacing: 12) {
+            LazyVStack(spacing: 10) {
               ForEach(viewStore.streamingLinks, id: \.url) { link in
                 Button {
                   viewStore.send(.linkSelected(link))
                   viewStore.send(.toggleSourceMenu)
                 } label: {
-                  HStack {
+                  HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                       Text(link.server)
-                        .font(.headline)
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
 
                       Text(link.quality ?? "Auto Quality")
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.7))
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.6))
                     }
 
                     Spacer()
 
                     if link.url == viewStore.selectedLink?.url {
                       Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.red)
-                        .font(.title2)
+                        .font(.system(size: 22))
+                        .foregroundColor(.blue)
                     } else {
                       Circle()
-                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                        .frame(width: 24, height: 24)
+                        .stroke(Color.white.opacity(0.3), lineWidth: 2)
+                        .frame(width: 22, height: 22)
                     }
                   }
-                  .padding()
+                  .padding(16)
                   .background(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 8)
                       .fill(
                         link.url == viewStore.selectedLink?.url
-                          ? Color.red.opacity(0.2) : Color.white.opacity(0.1))
+                          ? Color.blue.opacity(0.2) : Color.white.opacity(0.05))
                   )
                 }
               }
@@ -1057,31 +1189,29 @@ struct YouTubeStyleSourceMenu: View {
           }
           .frame(maxHeight: 300)
         }
-        .background(
-          RoundedRectangle(cornerRadius: 16)
-            .fill(Color.black.opacity(0.95))
-            .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: -5)
-        )
+        .background(Color(white: 0.1))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.5), radius: 20, x: 0, y: -10)
         .padding()
       }
     }
   }
 }
 
-// MARK: - YouTube Style Subtitle Menu
-struct YouTubeStyleSubtitleMenu: View {
+// MARK: - Disney Plus Subtitle Menu
+struct DisneyPlusSubtitleMenu: View {
   let store: StoreOf<PlayerFeature>
 
   var body: some View {
-    WithViewStore(store, observe: { $0 }) { viewStore in
+    WithViewStore(self.store, observe: { (state: PlayerFeature.State) in state }) { viewStore in
       VStack {
         Spacer()
 
         VStack(spacing: 0) {
-          /// Header
+          // Header
           HStack {
-            Text("Subtitles")
-              .font(.headline)
+            Text("Subtitles & Captions")
+              .font(.system(size: 18, weight: .bold))
               .foregroundColor(.white)
 
             Spacer()
@@ -1089,90 +1219,90 @@ struct YouTubeStyleSubtitleMenu: View {
             Button {
               viewStore.send(.toggleSubtitleMenu)
             } label: {
-              Image(systemName: "xmark")
-                .foregroundColor(.white)
+              Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 24))
+                .foregroundColor(.white.opacity(0.6))
             }
           }
           .padding()
-          .background(Color.black.opacity(0.95))
+          .background(Color(white: 0.15))
 
-          /// Subtitle options
+          // Subtitle options
           ScrollView {
-            LazyVStack(spacing: 12) {
-              // Add "None" option
+            LazyVStack(spacing: 10) {
+              // None option
               Button {
                 viewStore.send(.subtitleSelected(Subtitle.none))
                 viewStore.send(.toggleSubtitleMenu)
               } label: {
-                HStack {
+                HStack(spacing: 12) {
                   VStack(alignment: .leading, spacing: 4) {
-                    Text("None")
-                      .font(.headline)
+                    Text("Off")
+                      .font(.system(size: 16, weight: .semibold))
                       .foregroundColor(.white)
 
-                    Text("Turn off subtitles")
-                      .font(.subheadline)
-                      .foregroundColor(.white.opacity(0.7))
+                    Text("No subtitles")
+                      .font(.system(size: 13))
+                      .foregroundColor(.white.opacity(0.6))
                   }
 
                   Spacer()
 
                   if viewStore.selectedSubtitle?.id == "none" || viewStore.selectedSubtitle == nil {
                     Image(systemName: "checkmark.circle.fill")
-                      .foregroundColor(.red)
-                      .font(.title2)
+                      .font(.system(size: 22))
+                      .foregroundColor(.blue)
                   } else {
                     Circle()
-                      .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                      .frame(width: 24, height: 24)
+                      .stroke(Color.white.opacity(0.3), lineWidth: 2)
+                      .frame(width: 22, height: 22)
                   }
                 }
-                .padding()
+                .padding(16)
                 .background(
-                  RoundedRectangle(cornerRadius: 12)
+                  RoundedRectangle(cornerRadius: 8)
                     .fill(
-                      (viewStore.selectedSubtitle?.id == "none"
-                        || viewStore.selectedSubtitle == nil)
-                        ? Color.red.opacity(0.2) : Color.white.opacity(0.1))
+                      (viewStore.selectedSubtitle?.id == "none" || viewStore.selectedSubtitle == nil)
+                        ? Color.blue.opacity(0.2) : Color.white.opacity(0.05))
                 )
               }
 
-              // Add available subtitles
+              // Available subtitles
               ForEach(viewStore.availableSubtitles, id: \.id) { subtitle in
                 if !subtitle.isSpecialOption {
                   Button {
                     viewStore.send(.subtitleSelected(subtitle))
                     viewStore.send(.toggleSubtitleMenu)
                   } label: {
-                    HStack {
+                    HStack(spacing: 12) {
                       VStack(alignment: .leading, spacing: 4) {
                         Text(subtitle.displayNameWithInfo)
-                          .font(.headline)
+                          .font(.system(size: 16, weight: .semibold))
                           .foregroundColor(.white)
 
                         Text(subtitle.language.uppercased())
-                          .font(.subheadline)
-                          .foregroundColor(.white.opacity(0.7))
+                          .font(.system(size: 13))
+                          .foregroundColor(.white.opacity(0.6))
                       }
 
                       Spacer()
 
                       if subtitle.id == viewStore.selectedSubtitle?.id {
                         Image(systemName: "checkmark.circle.fill")
-                          .foregroundColor(.red)
-                          .font(.title2)
+                          .font(.system(size: 22))
+                          .foregroundColor(.blue)
                       } else {
                         Circle()
-                          .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                          .frame(width: 24, height: 24)
+                          .stroke(Color.white.opacity(0.3), lineWidth: 2)
+                          .frame(width: 22, height: 22)
                       }
                     }
-                    .padding()
+                    .padding(16)
                     .background(
-                      RoundedRectangle(cornerRadius: 12)
+                      RoundedRectangle(cornerRadius: 8)
                         .fill(
                           subtitle.id == viewStore.selectedSubtitle?.id
-                            ? Color.red.opacity(0.2) : Color.white.opacity(0.1))
+                            ? Color.blue.opacity(0.2) : Color.white.opacity(0.05))
                     )
                   }
                 }
@@ -1182,54 +1312,11 @@ struct YouTubeStyleSubtitleMenu: View {
           }
           .frame(maxHeight: 300)
         }
-        .background(
-          RoundedRectangle(cornerRadius: 16)
-            .fill(Color.black.opacity(0.95))
-            .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: -5)
-        )
+        .background(Color(white: 0.1))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.5), radius: 20, x: 0, y: -10)
         .padding()
       }
-    }
-  }
-}
-
-struct PlayerSettingsSection<Content: View>: View {
-  let title: String
-  @ViewBuilder let content: Content
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text(title)
-        .font(.caption)
-        .foregroundColor(.white.opacity(0.6))
-        .padding(.horizontal)
-        .padding(.top, 12)
-
-      content
-    }
-  }
-}
-
-struct SettingsButton: View {
-  let title: String
-  let isSelected: Bool
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: action) {
-      HStack {
-        Text(title)
-          .foregroundColor(.white)
-
-        Spacer()
-
-        if isSelected {
-          Image(systemName: "checkmark")
-            .foregroundColor(.red)
-        }
-      }
-      .padding()
-      .background(isSelected ? Color.white.opacity(0.1) : Color.clear)
     }
   }
 }
@@ -1244,14 +1331,14 @@ struct ModernAirPlayButton: UIViewRepresentable {
 
   func makeUIView(context: Context) -> AVRoutePickerView {
     let picker = AVRoutePickerView()
-    picker.tintColor = isActive ? .systemRed : .white
-    picker.activeTintColor = .systemRed
+    picker.tintColor = isActive ? .systemBlue : .white
+    picker.activeTintColor = .systemBlue
     picker.backgroundColor = .clear
     return picker
   }
 
   func updateUIView(_ uiView: AVRoutePickerView, context: Context) {
-    uiView.tintColor = isActive ? .systemRed : .white
+    uiView.tintColor = isActive ? .systemBlue : .white
   }
 }
 
@@ -1261,29 +1348,31 @@ struct ErrorOverlay: View {
   let onDismiss: () -> Void
 
   var body: some View {
-    VStack(spacing: 20) {
+    VStack(spacing: 24) {
       Image(systemName: "exclamationmark.triangle.fill")
-        .font(.system(size: 50))
-        .foregroundColor(.red)
+        .font(.system(size: 60))
+        .foregroundColor(.blue)
 
-      Text("Error")
-        .font(.title2.bold())
+      Text("Playback Error")
+        .font(.system(size: 24, weight: .bold))
         .foregroundColor(.white)
 
       Text(message)
-        .font(.body)
+        .font(.system(size: 16))
         .foregroundColor(.white.opacity(0.8))
         .multilineTextAlignment(.center)
         .padding(.horizontal, 40)
 
       Button(action: onDismiss) {
-        Text("Close")
-          .font(.headline)
+        Text("Go Back")
+          .font(.system(size: 16, weight: .semibold))
           .foregroundColor(.white)
-          .padding(.horizontal, 32)
-          .padding(.vertical, 12)
-          .background(Color.red)
-          .cornerRadius(8)
+          .padding(.horizontal, 40)
+          .padding(.vertical, 14)
+          .background(
+            Capsule()
+              .fill(Color.blue)
+          )
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)

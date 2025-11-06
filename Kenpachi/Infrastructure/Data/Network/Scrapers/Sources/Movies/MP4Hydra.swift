@@ -240,7 +240,7 @@ struct MP4Hydra: ScraperProtocol {
   }
 
   private func buildZPayload(slug: String, mediaType: String, season: Int?, episode: Int?) -> String {
-    var dict: [String: Any?] = [
+    let dict: [String: Any?] = [
       "s": slug,
       "t": mediaType,
       "se": season,

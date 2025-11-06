@@ -103,6 +103,10 @@ struct MainTabFeature {
         // Navigate to content detail from home
         return .send(.navigateToContentDetail(content.id, content.type))
 
+      case .home(.historyItemTapped(let entry)):
+        // Navigate to content detail directly from Home continue watching
+        return .send(.navigateToContentDetail(entry.contentId, entry.contentType))
+
       case .home:
         // Handled by HomeFeature scope
         return .none

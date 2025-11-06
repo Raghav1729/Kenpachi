@@ -47,6 +47,8 @@ struct SearchFeature {
     case onAppear
     /// Search query changed
     case searchQueryChanged(String)
+    /// Search submitted explicitly (e.g., Enter key)
+    case searchSubmitted
     /// Perform search
     case performSearch(String, page: Int)
     /// Search completed successfully
@@ -57,6 +59,8 @@ struct SearchFeature {
     case recentSearchTapped(String)
     /// Clear recent searches
     case clearRecentSearches
+    /// Delete a single recent search entry
+    case deleteRecentSearch(String)
     /// Content type filter selected
     case contentTypeFilterSelected(ContentType?)
     /// Genre filter selected
@@ -114,11 +118,19 @@ struct SearchFeature {
         }
 
         return .run { send in
-          /// Debounce search by 500ms
-          try await clock.sleep(for: .milliseconds(500))
+          /// Debounce search by 3 seconds
+          try await clock.sleep(for: .seconds(3))
           await send(.performSearch(query, page: 1))
         }
         .cancellable(id: "search")
+
+      case .searchSubmitted:
+        /// Immediate search on submit (cancel any pending debounce)
+        guard !state.searchQuery.isEmpty else { return .none }
+        return .merge(
+          .cancel(id: "search"),
+          .send(.performSearch(state.searchQuery, page: 1))
+        )
 
       case .performSearch(let query, let page):
         /// Perform search with current query and page
@@ -213,6 +225,12 @@ struct SearchFeature {
         /// Clear all recent searches
         clearRecentSearches()
         state.recentSearches = []
+        return .none
+
+      case .deleteRecentSearch(let query):
+        /// Delete a single recent search
+        removeRecentSearch(query)
+        state.recentSearches = loadRecentSearches()
         return .none
 
       case .contentTypeFilterSelected(let contentType):
@@ -325,5 +343,12 @@ extension SearchFeature {
   /// Clear all recent searches
   private func clearRecentSearches() {
     UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.recentSearches)
+  }
+
+  /// Remove a specific recent search
+  private func removeRecentSearch(_ query: String) {
+    var searches = loadRecentSearches()
+    searches.removeAll { $0 == query }
+    UserDefaults.standard.set(searches, forKey: UserDefaultsKeys.recentSearches)
   }
 }

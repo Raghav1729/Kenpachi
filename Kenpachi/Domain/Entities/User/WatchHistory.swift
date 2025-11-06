@@ -12,6 +12,8 @@ struct WatchHistoryEntry: Equatable, Identifiable, Codable {
   let contentId: String
   /// Title of the content
   let title: String
+  /// Content type (movie/show/anime)
+  let contentType: ContentType
   /// Season ID (for TV shows)
   let seasonId: String?
   /// Episode ID (for TV shows)
@@ -40,6 +42,7 @@ struct WatchHistoryEntry: Equatable, Identifiable, Codable {
     id: String = UUID().uuidString,
     contentId: String,
     title: String,
+    contentType: ContentType,
     seasonId: String? = nil,
     episodeId: String? = nil,
     seasonNumber: Int? = nil,
@@ -55,6 +58,7 @@ struct WatchHistoryEntry: Equatable, Identifiable, Codable {
     self.id = id
     self.contentId = contentId
     self.title = title
+    self.contentType = contentType
     self.seasonId = seasonId
     self.episodeId = episodeId
     self.seasonNumber = seasonNumber
@@ -130,8 +134,8 @@ struct WatchHistory: Equatable, Identifiable, Codable {
   }
 
   /// Remove entry
-  mutating func removeEntry(_ entryId: String) {
-    entries.removeAll { $0.id == entryId }
+  mutating func removeEntry(_ entryId: String, _ contentType: ContentType) {
+    entries.removeAll { $0.id == entryId && $0.contentType == contentType }
     updatedAt = Date()
   }
 

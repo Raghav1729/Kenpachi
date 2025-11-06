@@ -21,7 +21,8 @@ struct SearchView: View {
               get: \.searchQuery,
               send: { .searchQueryChanged($0) }
             ),
-            isFocused: $isSearchFocused
+            isFocused: $isSearchFocused,
+            onSubmit: { viewStore.send(.searchSubmitted) }
           )
           .padding(.horizontal, 16)
           .padding(.vertical, 12)
@@ -35,6 +36,7 @@ struct SearchView: View {
               popularContent: viewStore.popularContent,
               onRecentSearchTapped: { viewStore.send(.recentSearchTapped($0)) },
               onClearRecentSearches: { viewStore.send(.clearRecentSearches) },
+              onDeleteRecentSearch: { viewStore.send(.deleteRecentSearch($0)) },
               onContentTapped: { viewStore.send(.searchResultTapped($0)) }
             )
           } else if viewStore.isSearching {
@@ -95,6 +97,8 @@ struct SearchBar: View {
   @Binding var text: String
   /// Focus state binding
   var isFocused: FocusState<Bool>.Binding
+  /// Submit action (e.g., when user presses Enter)
+  var onSubmit: () -> Void = {}
 
   var body: some View {
     /// Search field (Hotstar style - full width)
@@ -108,6 +112,7 @@ struct SearchBar: View {
         .textFieldStyle(PlainTextFieldStyle())
         .foregroundColor(.textPrimary)
         .font(.bodyMedium)
+        .onSubmit(onSubmit)
 
       if !text.isEmpty {
         Button(action: { text = "" }) {
@@ -198,6 +203,8 @@ struct EmptySearchState: View {
   let onRecentSearchTapped: (String) -> Void
   /// Clear recent searches callback
   let onClearRecentSearches: () -> Void
+  /// Delete a single recent search callback
+  let onDeleteRecentSearch: (String) -> Void
   /// Content tap callback
   let onContentTapped: (Content) -> Void
 
@@ -223,16 +230,33 @@ struct EmptySearchState: View {
 
             FlowLayout(spacing: .spacingS) {
               ForEach(recentSearches, id: \.self) { query in
-                Button(action: { onRecentSearchTapped(query) }) {
-                  Text(query)
-                    .font(.labelMedium)
-                    .foregroundColor(.textPrimary)
-                    .padding(.horizontal, .spacingM - 2)
-                    .padding(.vertical, .spacingS)
-                    .background(Color.cardBackground)
-                    .cornerRadius(.radiusL)
+                HStack(spacing: .spacingXS) {
+                  Button(action: { onRecentSearchTapped(query) }) {
+                    Text(query)
+                      .font(.labelMedium)
+                      .foregroundColor(.textPrimary)
+                  }
+                  .buttonStyle(PlainButtonStyle())
+
+                  Button(action: { onDeleteRecentSearch(query) }) {
+                    Image(systemName: "xmark.circle.fill")
+                      .font(.captionLarge)
+                      .foregroundColor(.textSecondary)
+                  }
+                  .buttonStyle(PlainButtonStyle())
+                  .accessibilityLabel("Delete \(query)")
                 }
-                .buttonStyle(PlainButtonStyle())
+                .padding(.horizontal, .spacingM - 2)
+                .padding(.vertical, .spacingS)
+                .background(Color.cardBackground)
+                .cornerRadius(.radiusL)
+                .contextMenu {
+                  Button(role: .destructive) {
+                    onDeleteRecentSearch(query)
+                  } label: {
+                    Label("Delete", systemImage: "trash")
+                  }
+                }
               }
             }
           }
