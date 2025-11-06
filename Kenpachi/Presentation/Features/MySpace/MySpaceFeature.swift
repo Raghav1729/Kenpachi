@@ -91,15 +91,17 @@ struct MySpaceFeature {
         return .run { send in
           do {
             /// Fetch user profile
-            let profile =
-              try await UserRepository.shared.fetchUserProfile()
-              ?? UserProfile(
-                id: "user-1",
-                name: "User",
-                email: nil,
-                avatarURL: nil
-              )
-            await send(.profileLoaded(profile))
+            let profile = try await UserRepository.shared.fetchUserProfile()
+            let finalProfile = await MainActor.run {
+              profile
+                ?? UserProfile(
+                  id: "user-1",
+                  name: "User",
+                  email: nil,
+                  avatarURL: nil
+                )
+            }
+            await send(.profileLoaded(finalProfile))
 
             /// Fetch watchlist content
             let watchlistContent = try await WatchlistManager.shared.fetchWatchlistContent()

@@ -86,13 +86,12 @@ struct PlayerFeature {
       // Initialize PiP as supported by default (will be updated by the service)
       self.isPiPSupported = true
 
-      // Add sample subtitles for testing
-      self.availableSubtitles = [
-        Subtitle(id: "none", name: "None", language: "none", url: ""),
-        Subtitle(id: "en", name: "English", language: "en", url: ""),
-        Subtitle(id: "es", name: "Spanish", language: "es", url: ""),
-        Subtitle(id: "fr", name: "French", language: "fr", url: ""),
-      ]
+      // Get subtitles from the selected link
+      if let subtitles = streamingLinks.first?.subtitles, !subtitles.isEmpty {
+        self.availableSubtitles = [Subtitle.none] + subtitles
+      } else {
+        self.availableSubtitles = [Subtitle.none]
+      }
       self.selectedSubtitle = Subtitle.none
     }
   }
@@ -316,6 +315,16 @@ struct PlayerFeature {
         state.selectedLink = link
         state.selectedQuality = link.quality
         state.showSourceMenu = false
+        
+        // Update available subtitles when link changes
+        if let subtitles = link.subtitles, !subtitles.isEmpty {
+          state.availableSubtitles = [Subtitle.none] + subtitles
+        } else {
+          state.availableSubtitles = [Subtitle.none]
+        }
+        // Reset to no subtitles when changing links
+        state.selectedSubtitle = Subtitle.none
+        
         return .none
 
       case .airPlayTapped:

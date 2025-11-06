@@ -43,7 +43,7 @@ struct PlayerView: View {
             Color.clear
               .contentShape(Rectangle())
               .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.25)) {
+                _ = withAnimation(.easeInOut(duration: 0.25)) {
                   viewStore.send(.toggleControls)
                 }
                 if viewStore.showControls {
@@ -376,7 +376,7 @@ struct PlayerView: View {
     do {
       let audioSession = AVAudioSession.sharedInstance()
       try audioSession.setCategory(
-        .playback, mode: .moviePlayback, options: [.allowAirPlay, .allowBluetooth])
+        .playback, mode: .moviePlayback, options: [.allowAirPlay, .allowBluetoothA2DP])
       try audioSession.setActive(true)
     } catch {
       print("Failed to configure audio session: \(error)")
@@ -388,12 +388,18 @@ struct PlayerView: View {
       let currentItem = player.currentItem
     else { return }
 
-    // Disable all current subtitle tracks
+    // Disable all current subtitle tracks using async loading
     let asset = currentItem.asset
-    for characteristic in asset.availableMediaCharacteristicsWithMediaSelectionOptions {
-      if let group = asset.mediaSelectionGroup(forMediaCharacteristic: characteristic) {
-        if group.allowsEmptySelection {
-          currentItem.select(nil, in: group)
+    Task {
+      if let characteristics = try? await asset.load(
+        .availableMediaCharacteristicsWithMediaSelectionOptions)
+      {
+        for characteristic in characteristics {
+          if let group = try? await asset.loadMediaSelectionGroup(for: characteristic) {
+            if group.allowsEmptySelection {
+              currentItem.select(nil, in: group)
+            }
+          }
         }
       }
     }
@@ -444,7 +450,7 @@ struct PlayerView: View {
 
     controlsTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: false) { _ in
       if viewStore.isPlaying && viewStore.showControls {
-        withAnimation(.easeInOut(duration: 0.25)) {
+        _ = withAnimation(.easeInOut(duration: 0.25)) {
           viewStore.send(.toggleControls)
         }
       }

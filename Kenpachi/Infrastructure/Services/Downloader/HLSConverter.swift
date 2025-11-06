@@ -68,123 +68,129 @@ final class HLSConverter {
     let options = [AVURLAssetPreferPreciseDurationAndTimingKey: true]
     let asset = AVURLAsset(url: movpkgURL, options: options)
 
-    // Check if asset is playable
-    asset.loadValuesAsynchronously(forKeys: ["playable", "exportable"]) { [weak self] in
-      guard let self = self else { return }
+    // Check if asset is playable using async loading
+    Task {
+      do {
+        let isPlayable = try await asset.load(.isPlayable)
+        let isExportable = try await asset.load(.isExportable)
 
-      var error: NSError?
-      let playableStatus = asset.statusOfValue(forKey: "playable", error: &error)
-      let exportableStatus = asset.statusOfValue(forKey: "exportable", error: &error)
-
-      if playableStatus == .failed || exportableStatus == .failed {
-        AppLogger.shared.log(
-          "Asset not ready for export. Playable: \(playableStatus.rawValue), Exportable: \(exportableStatus.rawValue)",
-          level: .error
-        )
-        if let error = error {
-          AppLogger.shared.log("Asset error: \(error.localizedDescription)", level: .error)
+        // Check if asset is playable (exportable check is often false for downloaded HLS)
+        guard isPlayable else {
+          AppLogger.shared.log(
+            "Asset is not playable. Playable: \(isPlayable), Exportable: \(isExportable)",
+            level: .error
+          )
+          completion(.failure(ConversionError.assetNotPlayable))
+          return
         }
-        completion(.failure(ConversionError.assetNotPlayable))
-        return
-      }
 
-      // Check if asset is playable (exportable check is often false for downloaded HLS)
-      guard asset.isPlayable else {
-        AppLogger.shared.log(
-          "Asset is not playable. Playable: \(asset.isPlayable), Exportable: \(asset.isExportable)",
-          level: .error
-        )
-        completion(.failure(ConversionError.assetNotPlayable))
-        return
-      }
-      
-      // Log exportable status but don't fail if it's false (common for downloaded HLS)
-      if !asset.isExportable {
-        AppLogger.shared.log(
-          "Asset is not marked as exportable, but attempting conversion anyway. This is common for downloaded HLS content.",
-          level: .warning
-        )
-      }
-
-      AppLogger.shared.log("Asset is ready for export", level: .debug)
-
-      // Try to create export session with different presets if the first fails
-      var exportSession: AVAssetExportSession?
-      let presets = [quality.presetName, AVAssetExportPresetMediumQuality, AVAssetExportPresetLowQuality]
-      
-      for preset in presets {
-        if AVAssetExportSession.exportPresets(compatibleWith: asset).contains(preset) {
-          exportSession = AVAssetExportSession(asset: asset, presetName: preset)
-          AppLogger.shared.log("Created export session with preset: \(preset)", level: .debug)
-          break
+        // Log exportable status but don't fail if it's false (common for downloaded HLS)
+        if !isExportable {
+          AppLogger.shared.log(
+            "Asset is not marked as exportable, but attempting conversion anyway. This is common for downloaded HLS content.",
+            level: .warning
+          )
         }
-      }
-      
-      guard let exportSession = exportSession else {
-        AppLogger.shared.log("Failed to create export session with any preset", level: .error)
-        completion(.failure(ConversionError.exportSessionCreationFailed))
-        return
-      }
 
-      // Configure export session
-      exportSession.outputURL = finalOutputURL
-      exportSession.outputFileType = .mp4
-      exportSession.shouldOptimizeForNetworkUse = true
+        AppLogger.shared.log("Asset is ready for export", level: .debug)
 
-      // Store export session for progress tracking
-      let conversionId = UUID().uuidString
-      self.activeConversions[conversionId] = exportSession
+        // Try to create export session with different presets if the first fails
+        var exportSession: AVAssetExportSession?
+        let presets = [
+          quality.presetName, AVAssetExportPresetMediumQuality, AVAssetExportPresetLowQuality,
+        ]
 
-      AppLogger.shared.log(
-        "Export session created. Output: \(finalOutputURL.lastPathComponent)",
-        level: .info
-      )
-
-      // Start progress monitoring on main thread
-      DispatchQueue.main.async {
-        let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) {
-          [weak self] timer in
-          guard let self = self,
-            let session = self.activeConversions[conversionId]
-          else {
-            timer.invalidate()
-            return
+        for preset in presets {
+          let isCompatible = await withCheckedContinuation { continuation in
+            AVAssetExportSession.determineCompatibility(
+              ofExportPreset: preset, with: asset, outputFileType: .mp4
+            ) { isCompatible in
+              continuation.resume(returning: isCompatible)
+            }
           }
-
-          progress(Double(session.progress))
-
-          // Stop timer when complete
-          if session.progress >= 1.0 {
-            timer.invalidate()
+          if isCompatible {
+            exportSession = AVAssetExportSession(asset: asset, presetName: preset)
+            AppLogger.shared.log("Created export session with preset: \(preset)", level: .debug)
+            break
           }
         }
 
-        // Keep timer alive
-        RunLoop.current.add(timer, forMode: .common)
-      }
+        guard let exportSession = exportSession else {
+          AppLogger.shared.log("Failed to create export session with any preset", level: .error)
+          completion(.failure(ConversionError.exportSessionCreationFailed))
+          return
+        }
 
-      AppLogger.shared.log(
-        "Starting HLS to MP4 conversion: \(movpkgURL.lastPathComponent)",
-        level: .info
-      )
+        // Configure export session
+        exportSession.outputURL = finalOutputURL
+        exportSession.outputFileType = .mp4
+        exportSession.shouldOptimizeForNetworkUse = true
 
-      // Start export
-      exportSession.exportAsynchronously { [weak self] in
-        guard let self = self else { return }
+        // Store export session for progress tracking
+        let conversionId = UUID().uuidString
+        await MainActor.run {
+          self.activeConversions[conversionId] = exportSession
+        }
 
-        // Remove from active conversions
-        self.activeConversions.removeValue(forKey: conversionId)
+        AppLogger.shared.log(
+          "Export session created. Output: \(finalOutputURL.lastPathComponent)",
+          level: .info
+        )
 
-        switch exportSession.status {
-        case .completed:
+        // Start progress monitoring on main thread
+        DispatchQueue.main.async { [weak self] in
+          guard let self = self else { return }
+          
+          let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            Task { @MainActor [weak self] in
+              guard let self = self,
+                    let session = self.activeConversions[conversionId] else {
+                return
+              }
+
+              progress(Double(session.progress))
+            }
+          }
+
+          // Keep timer alive
+          RunLoop.current.add(timer, forMode: .common)
+          
+          // Store timer to invalidate later
+          Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            // Monitor completion and invalidate timer
+            while self.activeConversions[conversionId] != nil {
+              try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            }
+            timer.invalidate()
+          }
+        }
+
+        AppLogger.shared.log(
+          "Starting HLS to MP4 conversion: \(movpkgURL.lastPathComponent)",
+          level: .info
+        )
+
+        // Start export using modern async API
+        do {
+          try await exportSession.export(to: finalOutputURL, as: .mp4)
+
+          // Remove from active conversions
+          Task { @MainActor in
+            _ = self.activeConversions.removeValue(forKey: conversionId)
+          }
+
           AppLogger.shared.log(
             "Conversion completed: \(finalOutputURL.lastPathComponent)",
             level: .info
           )
           completion(.success(finalOutputURL))
+        } catch {
+          // Remove from active conversions
+          Task { @MainActor in
+            _ = self.activeConversions.removeValue(forKey: conversionId)
+          }
 
-        case .failed:
-          let error = exportSession.error ?? ConversionError.exportFailed
           AppLogger.shared.log(
             "Conversion failed: \(error.localizedDescription)",
             level: .error
@@ -195,7 +201,7 @@ final class HLSConverter {
               level: .error
             )
           }
-          
+
           // Try fallback method for problematic HLS assets
           self.attemptFallbackConversion(
             movpkgURL: movpkgURL,
@@ -203,16 +209,13 @@ final class HLSConverter {
             progress: progress,
             completion: completion
           )
-
-        case .cancelled:
-          AppLogger.shared.log("Conversion cancelled", level: .info)
-          completion(.failure(ConversionError.cancelled))
-
-        default:
-          AppLogger.shared.log(
-            "Conversion ended with unknown status: \(exportSession.status.rawValue)", level: .error)
-          completion(.failure(ConversionError.unknownError))
         }
+      } catch {
+        AppLogger.shared.log(
+          "Failed to load asset properties: \(error.localizedDescription)",
+          level: .error
+        )
+        completion(.failure(ConversionError.assetNotPlayable))
       }
     }
   }
@@ -260,7 +263,7 @@ final class HLSConverter {
     activeConversions.removeAll()
     AppLogger.shared.log("All conversions cancelled", level: .info)
   }
-  
+
   /// Fallback conversion method for problematic HLS assets
   /// This method tries alternative approaches when standard export fails
   private func attemptFallbackConversion(
@@ -270,14 +273,14 @@ final class HLSConverter {
     completion: @escaping (Result<URL, Error>) -> Void
   ) {
     AppLogger.shared.log("Attempting fallback conversion method", level: .info)
-    
+
     // For now, we'll inform the user that the file is already playable
     // In the future, we could implement segment copying or other methods
     AppLogger.shared.log(
       "Standard conversion failed. The .movpkg file is playable as-is in the app.",
       level: .info
     )
-    
+
     // Return the original movpkg URL since it's playable
     completion(.success(movpkgURL))
   }
@@ -335,7 +338,8 @@ enum ConversionError: LocalizedError {
     case .sourceNotFound:
       return "Source .movpkg file not found"
     case .assetNotPlayable:
-      return "The downloaded file cannot be converted. It may be incomplete, corrupted, or use a format that doesn't support conversion. The file is still playable in the app."
+      return
+        "The downloaded file cannot be converted. It may be incomplete, corrupted, or use a format that doesn't support conversion. The file is still playable in the app."
     case .exportSessionCreationFailed:
       return "Failed to create export session"
     case .exportFailed:

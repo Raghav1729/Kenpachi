@@ -317,16 +317,15 @@ struct FlixHQ: ScraperProtocol {
   /// - Returns: An array of `Season` objects, each populated with its episodes.
   private func fetchSeasonsAndEpisodes(for tvNumericId: String) async throws -> [Season] {
     // 1. Fetch Season List using the correct `v2` AJAX endpoint.
-    let seasonsEndpoint = FlixHQEndpoint(
-      baseURL: baseURL, path: "/ajax/v2/tv/seasons/\(tvNumericId)")
+    let seasonsEndpoint = await MainActor.run {
+      FlixHQEndpoint(baseURL: baseURL, path: "/ajax/v2/tv/seasons/\(tvNumericId)")
+    }
     let seasonsHtmlData = try await networkClient.requestData(seasonsEndpoint)
-    let seasonsDoc = try await MainActor.run {
-      try HTMLParser.parse(String(data: seasonsHtmlData, encoding: .utf8) ?? "")
-    }
+    let seasonsHtmlString = String(data: seasonsHtmlData, encoding: .utf8) ?? ""
+    let seasonsDoc = try HTMLParser.parse(seasonsHtmlString)
+
     // In the response, season links are `<a>` tags inside the dropdown menu.
-    let seasonElements = await MainActor.run {
-      HTMLParser.extractElements(from: seasonsDoc, selector: ".dropdown-menu a")
-    }
+    let seasonElements = HTMLParser.extractElements(from: seasonsDoc, selector: ".dropdown-menu a")
 
     // 2. Fetch Episodes for each season concurrently using a TaskGroup for performance.
     return try await withThrowingTaskGroup(of: Season.self) { group in
@@ -334,56 +333,52 @@ struct FlixHQ: ScraperProtocol {
 
       // A simple counter is reliable for determining the season number, as seen in the TS example.
       for (index, seasonElement) in seasonElements.enumerated() {
-        guard let seasonId = try? await MainActor.run(body: { try seasonElement.attr("data-id") })
-        else { continue }
+        guard let seasonId = try? seasonElement.attr("data-id") else { continue }
         let seasonNumber = index + 1
 
         // Add a new asynchronous task to the group for each season.
         group.addTask {
           // Fetch episodes using the correct `v2` AJAX endpoint.
-          let episodesEndpoint = FlixHQEndpoint(
-            baseURL: self.baseURL, path: "/ajax/v2/season/episodes/\(seasonId)")
+          let episodesEndpoint = await MainActor.run {
+            FlixHQEndpoint(baseURL: self.baseURL, path: "/ajax/v2/season/episodes/\(seasonId)")
+          }
           let episodesHtmlData = try await self.networkClient.requestData(episodesEndpoint)
-          let episodesDoc = try await MainActor.run {
-            try HTMLParser.parse(
-              String(data: episodesHtmlData, encoding: .utf8) ?? "")
-          }
+          let episodesHtmlString = String(data: episodesHtmlData, encoding: .utf8) ?? ""
+          
+          // Parse HTML and extract elements synchronously to avoid Sendable issues
+            let episodesDoc = try await HTMLParser.parse(episodesHtmlString)
+            let episodeElements = await HTMLParser.extractElements(from: episodesDoc, selector: ".nav > li")
 
-          // In the new response, episode items are `<li>` tags inside a `.nav`.
-          let episodeElements = await MainActor.run {
-            HTMLParser.extractElements(from: episodesDoc, selector: ".nav > li")
-          }
-
-          let episodes = try await MainActor.run {
-            episodeElements.compactMap { el -> Episode? in
-              guard let aTag = try? el.select("a").first(),
-                // The numeric ID is parsed from the element's `id` attribute (e.g., "episode-12345").
-                let rawId = try? aTag.attr("id"),
-                let episodeId = rawId.components(separatedBy: "-").last,
-                let titleAttr = try? aTag.attr("title")
-              else {
-                return nil
-              }
-              // Logic to parse "Eps X: Title" format.
-              let parts = titleAttr.components(separatedBy: ":")
-              let epNumberStr =
-                parts.first?.replacingOccurrences(of: "Eps", with: "").trimmingCharacters(
-                  in: .whitespaces) ?? ""
-              let epName =
-                parts.count > 1
-                ? parts.dropFirst().joined(separator: ":").trimmingCharacters(in: .whitespaces)
-                : titleAttr
-              guard let episodeNumber = Int(epNumberStr) else { return nil }
-
-              return Episode(
-                id: episodeId, episodeNumber: episodeNumber, seasonNumber: seasonNumber,
-                name: epName)
+          let episodes: [Episode] = episodeElements.compactMap { el -> Episode? in
+            guard let aTag = try? el.select("a").first(),
+              // The numeric ID is parsed from the element's `id` attribute (e.g., "episode-12345").
+              let rawId = try? aTag.attr("id"),
+              let episodeId = rawId.components(separatedBy: "-").last,
+              let titleAttr = try? aTag.attr("title")
+            else {
+              return nil
             }
+            // Logic to parse "Eps X: Title" format.
+            let parts = titleAttr.components(separatedBy: ":")
+            let epNumberStr =
+              parts.first?.replacingOccurrences(of: "Eps", with: "").trimmingCharacters(
+                in: .whitespaces) ?? ""
+            let epName =
+              parts.count > 1
+              ? parts.dropFirst().joined(separator: ":").trimmingCharacters(in: .whitespaces)
+              : titleAttr
+            guard let episodeNumber = Int(epNumberStr) else { return nil }
+
+            return Episode(
+              id: episodeId, episodeNumber: episodeNumber, seasonNumber: seasonNumber,
+              name: epName)
           }
           let seasonName = "Season \(seasonNumber)"
-          return Season(
-            id: seasonId, seasonNumber: seasonNumber, name: seasonName,
-            episodeCount: episodes.count, episodes: episodes)
+          return await MainActor.run {
+            Season(
+              id: seasonId, seasonNumber: seasonNumber, name: seasonName,
+              episodeCount: episodes.count, episodes: episodes)
+          }
         }
       }
       // Collect the results from all completed tasks.
@@ -412,7 +407,7 @@ struct FlixHQ: ScraperProtocol {
     var mutableEpisodeId = episodeId
 
     if !isMovie && mutableEpisodeId == nil {
-      var content = try await fetchContentDetails(id: contentId, type: ContentType.tvShow)
+      let content = try await fetchContentDetails(id: contentId, type: ContentType.tvShow)
       mutableEpisodeId = content.seasons?.first?.episodes?.first?.id
     }
 
@@ -430,7 +425,9 @@ struct FlixHQ: ScraperProtocol {
     }
 
     // 2. Fetch the server list HTML
-    let endpoint = FlixHQEndpoint(baseURL: baseURL, path: serversPath)
+    let endpoint = await MainActor.run {
+      FlixHQEndpoint(baseURL: baseURL, path: serversPath)
+    }
     let htmlData = try await networkClient.requestData(endpoint)
     let doc = try HTMLParser.parse(String(data: htmlData, encoding: .utf8) ?? "")
 
@@ -456,8 +453,9 @@ struct FlixHQ: ScraperProtocol {
               in: .whitespaces) ?? "Unknown"
 
           // Make an AJAX call to get the source embed link
-          let sourceEndpoint = FlixHQEndpoint(
-            baseURL: self.baseURL, path: "/ajax/episode/sources/\(id)")
+          let sourceEndpoint = await MainActor.run {
+            FlixHQEndpoint(baseURL: self.baseURL, path: "/ajax/episode/sources/\(id)")
+          }
 
           do {
             let sourceData = try await self.networkClient.requestData(sourceEndpoint)
@@ -467,25 +465,27 @@ struct FlixHQ: ScraperProtocol {
             // Special handling for VidCloud and Upcloud - use VidCloudExtractor directly
             let cleanedNameLower = cleanedName.lowercased()
             if cleanedNameLower.contains("vidcloud") || cleanedNameLower.contains("upcloud") {
-              let vidCloudExtractor = VidCloudExtractor(networkClient: self.networkClient)
+                let vidCloudExtractor = await VidCloudExtractor(networkClient: self.networkClient)
               let links = try? await vidCloudExtractor.extract(from: embedResponse.link)
               if let links = links {
                 return links
               }
             } else {
               // Use the ExtractorResolver to get the final, direct video links from the embed URL
-              let links = try? await self.extractorResolver.extract(from: embedResponse.link)
-              if let links = links {
-                return links.map { link in
-                  ExtractedLink(
-                    id: link.id,
-                    url: link.url,
-                    quality: link.quality,
-                    server: cleanedName,
-                    requiresReferer: link.requiresReferer,
-                    headers: link.headers,
-                    type: link.type
-                  )
+              if let links = try? await self.extractorResolver.extract(from: embedResponse.link) {
+                return await MainActor.run {
+                  links.map { link in
+                    ExtractedLink(
+                      id: link.id,
+                      url: link.url,
+                      quality: link.quality,
+                      server: cleanedName,
+                      requiresReferer: link.requiresReferer,
+                      headers: link.headers,
+                      type: link.type,
+                      subtitles: link.subtitles
+                    )
+                  }
                 }
               }
             }

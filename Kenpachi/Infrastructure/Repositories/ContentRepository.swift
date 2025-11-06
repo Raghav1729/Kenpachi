@@ -108,7 +108,7 @@ final class ContentRepository: ContentRepositoryProtocol {
   /// Fetches content details with caching
   func fetchContentDetails(id: String, type: ContentType?) async throws -> Content {
     // Get current scraper source name for scraper-based content
-    let sourceName = scraperManager.getActiveScraper()?.name
+    let sourceName = scraperManager.getActiveScraper()?.name ?? "unknown"
 
     // Check cache first with source-specific key for scraper content
     let cacheKey = "\(sourceName)_\(id)"

@@ -25,15 +25,18 @@ final class AppCacheManager: CacheManagerProtocol {
   func getCacheSize() async -> Int64 {
     var totalSize: Int64 = 0
 
-    guard let enumerator = fileManager.enumerator(
-      at: cacheDirectory,
-      includingPropertiesForKeys: [.fileSizeKey],
-      options: [.skipsHiddenFiles]
-    ) else {
+    guard
+      let enumerator = fileManager.enumerator(
+        at: cacheDirectory,
+        includingPropertiesForKeys: [.fileSizeKey],
+        options: [.skipsHiddenFiles]
+      )
+    else {
       return 0
     }
 
-    for case let fileURL as URL in enumerator {
+    let allURLs = enumerator.allObjects.compactMap { $0 as? URL }
+    for fileURL in allURLs {
       guard let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey]),
         let fileSize = resourceValues.fileSize
       else {
@@ -77,16 +80,19 @@ final class AppCacheManager: CacheManagerProtocol {
     let typeDirectory = cacheDirectory.appendingPathComponent(type.rawValue)
     var clearedSize: Int64 = 0
 
-    guard let enumerator = fileManager.enumerator(
-      at: typeDirectory,
-      includingPropertiesForKeys: [.fileSizeKey],
-      options: [.skipsHiddenFiles]
-    ) else {
+    guard
+      let enumerator = fileManager.enumerator(
+        at: typeDirectory,
+        includingPropertiesForKeys: [.fileSizeKey],
+        options: [.skipsHiddenFiles]
+      )
+    else {
       return 0
     }
 
     /// Calculate size before clearing
-    for case let fileURL as URL in enumerator {
+    let allURLs = enumerator.allObjects.compactMap { $0 as? URL }
+    for fileURL in allURLs {
       guard let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey]),
         let fileSize = resourceValues.fileSize
       else {
