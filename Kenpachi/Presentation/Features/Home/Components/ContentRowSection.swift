@@ -51,7 +51,7 @@ struct ContentRowSection: View {
             )
             .accessibilityElement(children: .combine)
             .accessibilityLabel(item.title)
-            .accessibilityHint("Double tap to see details")
+            .accessibilityHint(Text("content.tooltip.double_tap"))
           }
         }
         .padding(.horizontal, .spacingM)

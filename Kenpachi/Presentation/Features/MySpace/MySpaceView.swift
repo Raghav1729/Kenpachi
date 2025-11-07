@@ -55,6 +55,14 @@ struct MySpaceView: View {
                     }
                     .font(.labelMedium)
                     .foregroundColor(.primaryBlue)
+
+                    Text("\(store.watchHistory.count)")
+                      .font(.labelMedium)
+                      .foregroundColor(.textSecondary)
+                      .padding(.horizontal, .spacingS + 2)
+                      .padding(.vertical, .spacingXS)
+                      .background(Color.cardBackground)
+                      .cornerRadius(.radiusS)
                   }
                   .padding(.horizontal, .spacingM)
 
@@ -171,7 +179,7 @@ struct ProfileHeaderView: View {
             .font(.headlineLarge)
             .foregroundColor(.textPrimary)
 
-          Text("Current Scraper")
+          Text("myspace.current_scraper")
             .font(.bodySmall)
             .foregroundColor(.textSecondary)
         }

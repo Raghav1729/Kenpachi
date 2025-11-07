@@ -6,6 +6,7 @@ import AVKit
 import Combine
 import ComposableArchitecture
 import SwiftUI
+import UIKit
 
 struct PlayerView: View {
   let store: StoreOf<PlayerFeature>
@@ -21,12 +22,8 @@ struct PlayerView: View {
   @StateObject private var pipService = PictureInPictureService()
   
   // Gesture states
-  @State private var dragOffset: CGSize = .zero
-  @State private var lastBrightness: CGFloat = 0.5
-  @State private var isAdjustingBrightness = false
   @State private var currentScale: CGFloat = 1.0
   @State private var lastScale: CGFloat = 1.0
-  @State private var currentBrightness: CGFloat = 0.5
 
   var body: some View {
     WithViewStore(store, observe: \.self) { viewStore in
@@ -64,25 +61,6 @@ struct PlayerView: View {
                 lastScale = currentScale
               }
           )
-          .overlay(
-            // Drag gesture overlay for brightness control
-            GeometryReader { geometry in
-              Color.clear
-                .contentShape(Rectangle())
-                .gesture(
-                  DragGesture(minimumDistance: 20)
-                    .onChanged { value in
-                      if !viewStore.isSeeking {
-                        handleDragGesture(value: value, geometry: geometry, viewStore: viewStore)
-                      }
-                    }
-                    .onEnded { _ in
-                      isAdjustingBrightness = false
-                      dragOffset = .zero
-                    }
-                )
-            }
-          )
         } else if viewStore.isLoading {
           ProgressView()
             .tint(.white)
@@ -96,11 +74,7 @@ struct PlayerView: View {
             .scaleEffect(1.2)
         }
         
-        // Brightness indicator
-        if isAdjustingBrightness {
-          BrightnessIndicator(brightness: currentBrightness)
-            .transition(.opacity)
-        }
+        
 
         // Controls overlay
         if viewStore.showControls {
@@ -159,15 +133,17 @@ struct PlayerView: View {
       .statusBar(hidden: true)
       .persistentSystemOverlays(.hidden)
       .onAppear {
-        setOrientation(.landscapeRight)
+        enforceLandscape()
         viewStore.send(.onAppear)
-        setupPlayer(viewStore: viewStore)
-        setupServices(viewStore: viewStore)
-        resetControlsTimer(viewStore: viewStore)
-        setupAppLifecycleObservers(viewStore: viewStore)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+          setupPlayer(viewStore: viewStore)
+          setupServices(viewStore: viewStore)
+          resetControlsTimer(viewStore: viewStore)
+          setupAppLifecycleObservers(viewStore: viewStore)
+        }
       }
       .onDisappear {
-        setOrientation(.portrait)
+        enforcePortrait()
         viewStore.send(.onDisappear)
         cleanupPlayer()
         cleanupServices()
@@ -178,6 +154,7 @@ struct PlayerView: View {
       .onChange(of: viewStore.isPlaying) { _, isPlaying in
         isPlaying ? player?.play() : player?.pause()
         isPlaying ? resetControlsTimer(viewStore: viewStore) : controlsTimer?.invalidate()
+        if isPlaying { enforceLandscape() }
       }
       .onChange(of: viewStore.playbackSpeed) { _, speed in
         player?.rate = speed
@@ -191,24 +168,16 @@ struct PlayerView: View {
       .onChange(of: viewStore.selectedSubtitle) { _, subtitle in
         applySubtitle(subtitle)
       }
+      .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+        let orientation = UIDevice.current.orientation
+        if orientation.isPortrait {
+          enforceLandscape()
+        }
+      }
     }
   }
   
   // MARK: - Gesture Handlers
-  
-  private func handleDragGesture(value: DragGesture.Value, geometry: GeometryProxy, viewStore: ViewStoreOf<PlayerFeature>) {
-    // Brightness control on vertical swipe
-    isAdjustingBrightness = true
-    let delta = -value.translation.height / 300
-    let newBrightness = min(max(lastBrightness + delta, 0), 1)
-    currentBrightness = newBrightness
-    // Set brightness on main screen if available
-    if let screen = UIApplication.shared.connectedScenes
-      .compactMap({ $0 as? UIWindowScene })
-      .first?.screen {
-      screen.brightness = newBrightness
-    }
-  }
 
   // MARK: - Player Setup
   
@@ -293,13 +262,6 @@ struct PlayerView: View {
     newPlayer.play()
     viewStore.send(.playbackStateChanged(true))
     
-    // Store initial brightness
-    if let screen = UIApplication.shared.connectedScenes
-      .compactMap({ $0 as? UIWindowScene })
-      .first?.screen {
-      lastBrightness = screen.brightness
-      currentBrightness = screen.brightness
-    }
   }
 
   private func updatePlayerItem(with link: ExtractedLink) {
@@ -511,6 +473,43 @@ struct PlayerView: View {
       UIDevice.current.setValue(orientation.rawValue, forKey: "orientation")
     }
   }
+
+  private func setOrientationMask(_ mask: UIInterfaceOrientationMask) {
+    if #available(iOS 16.0, *) {
+      guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+      scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask))
+    } else {
+      // Best-effort fallback for < iOS 16: set a representative orientation
+      if mask.contains(.landscape) {
+        UIDevice.current.setValue(UIInterfaceOrientation.landscapeRight.rawValue, forKey: "orientation")
+      } else if mask.contains(.portrait) {
+        UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
+      }
+    }
+  }
+
+  private func enforceLandscape() {
+    DispatchQueue.main.async {
+      setOrientationMask(.landscape)
+      setOrientation(.landscapeRight)
+    }
+    // Reassert shortly after to ensure rotation when coming from strict portrait
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+      setOrientationMask(.landscape)
+      setOrientation(.landscapeRight)
+    }
+  }
+
+  private func enforcePortrait() {
+    DispatchQueue.main.async {
+      setOrientationMask(.portrait)
+      setOrientation(.portrait)
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+      setOrientationMask(.portrait)
+      setOrientation(.portrait)
+    }
+  }
 }
 
 extension UIInterfaceOrientation {
@@ -561,30 +560,6 @@ struct DisneyPlusVideoPlayer: UIViewRepresentable {
 }
 
 // MARK: - Brightness Indicator
-struct BrightnessIndicator: View {
-  let brightness: CGFloat
-  
-  var body: some View {
-    VStack(spacing: 12) {
-      Image(systemName: "sun.max.fill")
-        .font(.system(size: 24))
-        .foregroundColor(.white)
-      
-      ProgressView(value: brightness, total: 1.0)
-        .progressViewStyle(LinearProgressViewStyle(tint: .white))
-        .frame(width: 150)
-      
-      Text("\(Int(brightness * 100))%")
-        .font(.caption)
-        .foregroundColor(.white)
-    }
-    .padding(20)
-    .background(
-      RoundedRectangle(cornerRadius: 12)
-        .fill(Color.black.opacity(0.8))
-    )
-  }
-}
 
 // MARK: - Disney Plus Player Controls
 struct DisneyPlusPlayerControls: View {
@@ -603,7 +578,7 @@ struct DisneyPlusPlayerControls: View {
             HStack(spacing: 8) {
               Image(systemName: "chevron.left")
                 .font(.system(size: 20, weight: .semibold))
-              Text("Back")
+              Text("common.back")
                 .font(.system(size: 16, weight: .medium))
             }
             .foregroundColor(.white)
@@ -671,12 +646,12 @@ struct DisneyPlusPlayerControls: View {
           } label: {
             ZStack {
               Circle()
-                .fill(Color.white)
+                .fill(Color.white.opacity(0.15))
                 .frame(width: 80, height: 80)
-              
+
               Image(systemName: viewStore.isPlaying ? "pause.fill" : "play.fill")
                 .font(.system(size: 32, weight: .bold))
-                .foregroundColor(.black)
+                .foregroundColor(.white)
                 .offset(x: viewStore.isPlaying ? 0 : 3)
             }
           }
@@ -924,7 +899,7 @@ struct DisneyPlusSettingsPanel: View {
         VStack(spacing: 0) {
           // Header
           HStack {
-            Text("Settings")
+            Text("settings.title")
               .font(.system(size: 18, weight: .bold))
               .foregroundColor(.white)
 
@@ -944,10 +919,10 @@ struct DisneyPlusSettingsPanel: View {
           ScrollView {
             VStack(spacing: 0) {
               // Playback Speed
-              PlayerSettingsSection(title: "Playback Speed") {
+              PlayerSettingsSection(title: "settings.player.playback_speed") {
                 ForEach(viewStore.availablePlaybackSpeeds, id: \.self) { speed in
                   PlayerSettingsRow(
-                    title: speed == 1.0 ? "Normal" : "\(String(format: "%.2fx", speed))",
+                    title: speed == 1.0 ? "player.speed.normal" : "\(String(format: "%.2fx", speed))",
                     isSelected: speed == viewStore.playbackSpeed
                   ) {
                     viewStore.send(.playbackSpeedChanged(speed))
@@ -957,7 +932,7 @@ struct DisneyPlusSettingsPanel: View {
 
               // Quality
               if !viewStore.availableQualities.isEmpty {
-                PlayerSettingsSection(title: "Quality") {
+                PlayerSettingsSection(title: "settings.player.default_quality") {
                   ForEach(viewStore.availableQualities, id: \.self) { quality in
                     PlayerSettingsRow(
                       title: quality,
@@ -1054,7 +1029,7 @@ struct DisneyPlusSpeedMenu: View {
         VStack(spacing: 0) {
           // Header
           HStack {
-            Text("Playback Speed")
+            Text("player.menu.playback_speed.title")
               .font(.system(size: 18, weight: .bold))
               .foregroundColor(.white)
 
@@ -1079,7 +1054,7 @@ struct DisneyPlusSpeedMenu: View {
                 viewStore.send(.toggleSpeedMenu)
               } label: {
                 VStack(spacing: 8) {
-                  Text(speed == 1.0 ? "Normal" : "\(String(format: "%.2fx", speed))")
+                  Text(speed == 1.0 ? "player.speed.normal" : "\(String(format: "%.2fx", speed))")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(speed == viewStore.playbackSpeed ? .blue : .white)
 
@@ -1127,7 +1102,7 @@ struct DisneyPlusSourceMenu: View {
         VStack(spacing: 0) {
           // Header
           HStack {
-            Text("Video Source")
+            Text("player.menu.source.title")
               .font(.system(size: 18, weight: .bold))
               .foregroundColor(.white)
 
@@ -1210,7 +1185,7 @@ struct DisneyPlusSubtitleMenu: View {
         VStack(spacing: 0) {
           // Header
           HStack {
-            Text("Subtitles & Captions")
+            Text("player.menu.subtitles.title")
               .font(.system(size: 18, weight: .bold))
               .foregroundColor(.white)
 
@@ -1237,11 +1212,11 @@ struct DisneyPlusSubtitleMenu: View {
               } label: {
                 HStack(spacing: 12) {
                   VStack(alignment: .leading, spacing: 4) {
-                    Text("Off")
+                    Text("player.subtitles.off")
                       .font(.system(size: 16, weight: .semibold))
                       .foregroundColor(.white)
 
-                    Text("No subtitles")
+                    Text("player.subtitles.none_description")
                       .font(.system(size: 13))
                       .foregroundColor(.white.opacity(0.6))
                   }
@@ -1353,7 +1328,7 @@ struct ErrorOverlay: View {
         .font(.system(size: 60))
         .foregroundColor(.blue)
 
-      Text("Playback Error")
+      Text("player.error.playback")
         .font(.system(size: 24, weight: .bold))
         .foregroundColor(.white)
 
@@ -1364,7 +1339,7 @@ struct ErrorOverlay: View {
         .padding(.horizontal, 40)
 
       Button(action: onDismiss) {
-        Text("Go Back")
+        Text("common.back")
           .font(.system(size: 16, weight: .semibold))
           .foregroundColor(.white)
           .padding(.horizontal, 40)

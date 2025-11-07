@@ -273,21 +273,59 @@ final class DownloadQueueManager {
   /// Deletes a completed download
   /// - Parameter downloadId: ID of download to delete
   func deleteDownload(_ downloadId: String) {
-    // Find and remove from completed downloads
-    if let index = completedDownloads.firstIndex(where: { $0.id == downloadId }) {
-      let download = completedDownloads.remove(at: index)
+    var deleted = false
 
-      // TODO: Delete downloaded files from disk
-
-      // Log deletion
-      AppLogger.shared.log(
-        "Download deleted: \(download.content.title)",
-        level: .debug
-      )
+    // Helper to delete file from disk if present
+    func deleteFileIfPresent(for download: Download) {
+      if let fileURL = download.localFilePath,
+         FileManager.default.fileExists(atPath: fileURL.path) {
+        do {
+          try FileManager.default.removeItem(at: fileURL)
+          AppLogger.shared.log("Deleted file from disk: \(fileURL.lastPathComponent)", level: .info)
+        } catch {
+          AppLogger.shared.log("Failed to delete file: \(error)", level: .error)
+        }
+      }
     }
 
-    // Persist downloads
-    persistDownloads()
+    // If active, cancel and remove
+    if let idx = activeDownloads.firstIndex(where: { $0.id == downloadId }) {
+      let download = activeDownloads.remove(at: idx)
+      AVDownloaderService.shared.cancelDownload(downloadId: downloadId)
+      deleteFileIfPresent(for: download)
+      AppLogger.shared.log("Active download deleted: \(download.content.title)", level: .debug)
+      deleted = true
+    }
+
+    // If queued, remove
+    if let idx = queuedDownloads.firstIndex(where: { $0.id == downloadId }) {
+      let download = queuedDownloads.remove(at: idx)
+      AppLogger.shared.log("Queued download deleted: \(download.content.title)", level: .debug)
+      deleted = true
+    }
+
+    // If completed, remove and delete file
+    if let idx = completedDownloads.firstIndex(where: { $0.id == downloadId }) {
+      let download = completedDownloads.remove(at: idx)
+      deleteFileIfPresent(for: download)
+      AppLogger.shared.log("Completed download deleted: \(download.content.title)", level: .debug)
+      deleted = true
+    }
+
+    // If failed, remove
+    if let idx = failedDownloads.firstIndex(where: { $0.id == downloadId }) {
+      let download = failedDownloads.remove(at: idx)
+      deleteFileIfPresent(for: download)
+      AppLogger.shared.log("Failed download deleted: \(download.content.title)", level: .debug)
+      deleted = true
+    }
+
+    if deleted {
+      // Persist downloads
+      persistDownloads()
+      // Start next if slot freed
+      startNextQueuedDownload()
+    }
   }
 
   /// Resumes all pending downloads

@@ -254,7 +254,7 @@ struct EmptySearchState: View {
                   Button(role: .destructive) {
                     onDeleteRecentSearch(query)
                   } label: {
-                    Label("Delete", systemImage: "trash")
+                    Label("downloads.action.delete", systemImage: "trash")
                   }
                 }
               }

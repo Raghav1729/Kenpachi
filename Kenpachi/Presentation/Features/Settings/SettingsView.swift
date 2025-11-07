@@ -12,11 +12,11 @@ struct SettingsView: View {
   var body: some View {
     NavigationStack {
       contentView
-        .navigationTitle("Settings")
+        .navigationTitle("settings.title")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
           ToolbarItem(placement: .navigationBarTrailing) {
-            Button("Done") {
+            Button("common.done") {
               dismiss()
             }
             .foregroundColor(.primaryBlue)
@@ -60,10 +60,10 @@ struct SettingsView: View {
 
   // MARK: - General Section
   private var generalSection: some View {
-    SettingsSection(title: "General") {
+    SettingsSection(title: "settings.general.title") {
       SettingsRow(
         icon: "paintbrush.fill",
-        title: "Theme",
+        title: "settings.general.theme",
         value: store.selectedTheme.displayName
       ) {
         ThemePicker(selection: $store.selectedTheme.sending(\.themeChanged))
@@ -71,7 +71,7 @@ struct SettingsView: View {
 
       SettingsRow(
         icon: "paintpalette.fill",
-        title: "Accent Color",
+        title: "settings.general.accent_color",
         value: store.accentColor.displayName
       ) {
         AccentColorPicker(selection: $store.accentColor.sending(\.accentColorChanged))
@@ -81,18 +81,18 @@ struct SettingsView: View {
 
   // MARK: - Security Section
   private var securitySection: some View {
-    SettingsSection(title: "Security") {
+    SettingsSection(title: "settings.security.title") {
       SettingsToggleRow(
         icon: "faceid",
-        title: "Biometric Authentication",
-        subtitle: "Use Face ID or Touch ID to unlock",
+        title: "settings.security.biometric_auth",
+        subtitle: "settings.security.biometric_auth_subtitle",
         isOn: $store.biometricAuthEnabled.sending(\.biometricAuthToggled)
       )
 
       if store.biometricAuthEnabled {
         SettingsRow(
           icon: "lock.fill",
-          title: "Auto Lock",
+          title: "settings.security.auto_lock",
           value: store.autoLockTimeout.displayName
         ) {
           AutoLockPicker(selection: $store.autoLockTimeout.sending(\.autoLockTimeoutChanged))
@@ -103,11 +103,11 @@ struct SettingsView: View {
 
   // MARK: - Content Preferences Section
   private var contentPreferencesSection: some View {
-    SettingsSection(title: "Content Preferences") {
+    SettingsSection(title: "settings.content.title") {
       SettingsRow(
         icon: "server.rack",
-        title: "Scraper Source",
-        subtitle: "Default content provider",
+        title: "settings.content.scraper_source",
+        subtitle: "settings.content.scraper_source_subtitle",
         value: store.defaultScraperSource.displayName
       ) {
         ScraperSourcePicker(
@@ -116,7 +116,7 @@ struct SettingsView: View {
 
       SettingsRow(
         icon: "globe",
-        title: "Preferred Language",
+        title: "settings.content.language",
         value: store.preferredLanguage.displayName
       ) {
         LanguagePicker(selection: $store.preferredLanguage.sending(\.preferredLanguageChanged))
@@ -124,8 +124,8 @@ struct SettingsView: View {
 
       SettingsToggleRow(
         icon: "18.circle.fill",
-        title: "Show Adult Content",
-        subtitle: "Display mature content in search results",
+        title: "settings.content.adult_content",
+        subtitle: "settings.content.adult_content_subtitle",
         isOn: $store.showAdultContent.sending(\.showAdultContentToggled)
       )
     }
@@ -133,17 +133,17 @@ struct SettingsView: View {
 
   // MARK: - Parental Controls Section
   private var parentalControlsSection: some View {
-    SettingsSection(title: "Parental Controls") {
+    SettingsSection(title: "settings.parental_controls.title") {
       SettingsToggleRow(
         icon: "person.2.fill",
-        title: "Enable Parental Controls",
+        title: "settings.parental_controls.enable",
         isOn: $store.parentalControlsEnabled.sending(\.parentalControlsToggled)
       )
 
       if store.parentalControlsEnabled {
         SettingsRow(
           icon: "shield.lefthalf.filled",
-          title: "Allowed Content Rating",
+          title: "settings.parental_controls.allowed_rating_title",
           value: store.allowedContentRating.displayName
         ) {
           ContentRatingPicker(
@@ -155,24 +155,24 @@ struct SettingsView: View {
 
   // MARK: - Player Settings Section
   private var playerSettingsSection: some View {
-    SettingsSection(title: "Player Settings") {
+    SettingsSection(title: "settings.player.title") {
       SettingsToggleRow(
         icon: "play.circle.fill",
-        title: "Auto-Play Next Episode",
-        subtitle: "Automatically play next episode",
+        title: "settings.player.autoplay",
+        subtitle: "settings.player.autoplay_subtitle",
         isOn: $store.autoPlayEnabled.sending(\.autoPlayToggled)
       )
 
       SettingsToggleRow(
         icon: "film.fill",
-        title: "Auto-Play Trailers",
-        subtitle: "Play trailers on detail pages",
+        title: "settings.player.autoplay_trailers",
+        subtitle: "settings.player.autoplay_trailers_subtitle",
         isOn: $store.autoPlayTrailers.sending(\.autoPlayTrailersToggled)
       )
 
       SettingsRow(
         icon: "video.fill",
-        title: "Default Quality",
+        title: "settings.player.default_quality",
         value: store.defaultQuality.displayName
       ) {
         QualityPicker(selection: $store.defaultQuality.sending(\.defaultQualityChanged))
@@ -180,14 +180,14 @@ struct SettingsView: View {
 
       SettingsToggleRow(
         icon: "captions.bubble.fill",
-        title: "Subtitles",
+        title: "settings.player.subtitles",
         isOn: $store.subtitlesEnabled.sending(\.subtitlesToggled)
       )
 
       if store.subtitlesEnabled {
         SettingsRow(
           icon: "text.bubble.fill",
-          title: "Subtitle Language",
+          title: "settings.player.subtitle_language",
           value: store.preferredSubtitleLanguage.displayName
         ) {
           SubtitleLanguagePicker(
@@ -197,7 +197,7 @@ struct SettingsView: View {
 
       SettingsRow(
         icon: "speaker.wave.2.fill",
-        title: "Audio Language",
+        title: "settings.player.audio_language",
         value: store.preferredAudioLanguage.displayName
       ) {
         AudioLanguagePicker(
@@ -206,7 +206,7 @@ struct SettingsView: View {
 
       SettingsRow(
         icon: "speedometer",
-        title: "Playback Speed",
+        title: "settings.player.playback_speed",
         value: store.playbackSpeed.displayName
       ) {
         PlaybackSpeedPicker(selection: $store.playbackSpeed.sending(\.playbackSpeedChanged))
@@ -216,10 +216,10 @@ struct SettingsView: View {
 
   // MARK: - Download Settings Section
   private var downloadSettingsSection: some View {
-    SettingsSection(title: "Downloads") {
+    SettingsSection(title: "settings.downloads.title") {
       SettingsRow(
         icon: "arrow.down.circle.fill",
-        title: "Download Quality",
+        title: "settings.downloads.quality",
         value: store.downloadQuality.displayName
       ) {
         QualityPicker(selection: $store.downloadQuality.sending(\.downloadQualityChanged))
@@ -227,15 +227,15 @@ struct SettingsView: View {
 
       SettingsToggleRow(
         icon: "antenna.radiowaves.left.and.right",
-        title: "Download Over Cellular",
-        subtitle: "Allow downloads on mobile data",
+        title: "settings.downloads.cellular",
+        subtitle: "settings.downloads.cellular_subtitle",
         isOn: $store.downloadOverCellular.sending(\.downloadOverCellularToggled)
       )
 
       SettingsToggleRow(
         icon: "trash.fill",
-        title: "Auto-Delete Watched",
-        subtitle: "Remove downloads after watching",
+        title: "settings.downloads.auto_delete",
+        subtitle: "settings.downloads.auto_delete_subtitle",
         isOn: $store.autoDeleteWatchedDownloads.sending(\.autoDeleteWatchedToggled)
       )
     }
@@ -243,30 +243,30 @@ struct SettingsView: View {
 
   // MARK: - Notifications Section
   private var notificationsSection: some View {
-    SettingsSection(title: "Notifications") {
+    SettingsSection(title: "settings.notifications.title") {
       SettingsToggleRow(
         icon: "bell.fill",
-        title: "Push Notifications",
-        subtitle: "Receive app notifications",
+        title: "settings.notifications.push",
+        subtitle: "settings.notifications.push_subtitle",
         isOn: $store.pushNotificationsEnabled.sending(\.pushNotificationsToggled)
       )
 
       if store.pushNotificationsEnabled {
         SettingsToggleRow(
           icon: "sparkles",
-          title: "New Content",
+          title: "settings.notifications.new_content",
           isOn: $store.newContentNotifications.sending(\.newContentNotificationsToggled)
         )
 
         SettingsToggleRow(
           icon: "checkmark.circle.fill",
-          title: "Download Complete",
+          title: "settings.notifications.downloads",
           isOn: $store.downloadCompleteNotifications.sending(\.downloadNotificationsToggled)
         )
 
         SettingsToggleRow(
           icon: "star.fill",
-          title: "Recommendations",
+          title: "settings.notifications.recommendations",
           isOn: $store.recommendationNotifications.sending(\.recommendationNotificationsToggled)
         )
       }
@@ -275,25 +275,25 @@ struct SettingsView: View {
 
   // MARK: - Streaming Section
   private var streamingSection: some View {
-    SettingsSection(title: "Streaming") {
+    SettingsSection(title: "settings.streaming.title") {
       SettingsToggleRow(
         icon: "airplayvideo",
-        title: "AirPlay",
-        subtitle: "Stream to Apple TV and AirPlay devices",
+        title: "settings.streaming.airplay",
+        subtitle: "settings.streaming.airplay_subtitle",
         isOn: $store.airPlayEnabled.sending(\.airPlayToggled)
       )
 
       SettingsToggleRow(
         icon: "tv.fill",
-        title: "Chromecast",
-        subtitle: "Cast to Chromecast devices",
+        title: "settings.streaming.chromecast",
+        subtitle: "settings.streaming.chromecast_subtitle",
         isOn: $store.chromecastEnabled.sending(\.chromecastToggled)
       )
 
       SettingsToggleRow(
         icon: "pip.fill",
-        title: "Picture in Picture",
-        subtitle: "Watch while using other apps",
+        title: "settings.streaming.pip",
+        subtitle: "settings.streaming.pip_subtitle",
         isOn: $store.pipEnabled.sending(\.pipToggled)
       )
     }
@@ -301,39 +301,39 @@ struct SettingsView: View {
 
   // MARK: - Privacy Section
   private var privacySection: some View {
-    SettingsSection(title: "Privacy") {
+    SettingsSection(title: "settings.privacy.title") {
       SettingsToggleRow(
         icon: "chart.bar.fill",
-        title: "Analytics",
-        subtitle: "Help improve the app",
+        title: "settings.privacy.analytics",
+        subtitle: "settings.privacy.analytics_subtitle",
         isOn: $store.analyticsEnabled.sending(\.analyticsToggled)
       )
 
       SettingsToggleRow(
         icon: "exclamationmark.triangle.fill",
-        title: "Crash Reporting",
-        subtitle: "Send crash reports",
+        title: "settings.privacy.crash_reporting",
+        subtitle: "settings.privacy.crash_reporting_subtitle",
         isOn: $store.crashReportingEnabled.sending(\.crashReportingToggled)
       )
 
       SettingsToggleRow(
         icon: "sparkles.rectangle.stack.fill",
-        title: "Personalized Recommendations",
-        subtitle: "Based on your viewing history",
+        title: "settings.privacy.personalized",
+        subtitle: "settings.privacy.personalized_subtitle",
         isOn: $store.personalizedRecommendations.sending(\.personalizedRecommendationsToggled)
       )
 
       SettingsToggleRow(
         icon: "clock.arrow.circlepath",
-        title: "Search History",
-        subtitle: "Save recent searches",
+        title: "settings.privacy.search_history",
+        subtitle: "settings.privacy.search_history_subtitle",
         isOn: $store.searchHistoryEnabled.sending(\.searchHistoryToggled)
       )
 
       if store.searchHistoryEnabled {
         SettingsButtonRow(
           icon: "trash.fill",
-          title: "Clear Search History",
+          title: "settings.privacy.clear_search_history",
           style: .destructive
         ) {
           store.send(.clearSearchHistoryTapped)
@@ -344,34 +344,34 @@ struct SettingsView: View {
 
   // MARK: - Storage Section
   private var storageSection: some View {
-    SettingsSection(title: "Storage") {
+    SettingsSection(title: "settings.storage.title") {
       StorageInfoRow(
         icon: "internaldrive.fill",
-        title: "Total Used",
+        title: "settings.storage.total_used",
         size: store.totalStorageUsed
       )
 
       StorageInfoRow(
         icon: "square.stack.3d.up.fill",
-        title: "Cache",
+        title: "settings.storage.cache",
         size: store.cacheSize
       )
 
       StorageInfoRow(
         icon: "photo.stack.fill",
-        title: "Image Cache",
+        title: "settings.storage.image_cache",
         size: store.imageCacheSize
       )
 
       StorageInfoRow(
         icon: "arrow.down.circle.fill",
-        title: "Downloads",
+        title: "settings.storage.downloads",
         size: store.downloadsSize
       )
 
       SettingsButtonRow(
         icon: "trash.fill",
-        title: "Clear Cache",
+        title: "settings.storage.clear_cache",
         style: .destructive,
         isLoading: store.isClearingCache
       ) {
@@ -380,7 +380,7 @@ struct SettingsView: View {
 
       SettingsButtonRow(
         icon: "trash.fill",
-        title: "Clear Image Cache",
+        title: "settings.storage.clear_image_cache",
         style: .destructive,
         isLoading: store.isClearingImageCache
       ) {
@@ -389,7 +389,7 @@ struct SettingsView: View {
 
       SettingsButtonRow(
         icon: "trash.fill",
-        title: "Clear User Data",
+        title: "settings.storage.clear_user_data",
         style: .destructive,
         isLoading: store.isClearingUserData
       ) {
@@ -400,30 +400,30 @@ struct SettingsView: View {
 
   // MARK: - About Section
   private var aboutSection: some View {
-    SettingsSection(title: "About") {
+    SettingsSection(title: "settings.about.title") {
       SettingsInfoRow(
         icon: "info.circle.fill",
-        title: "Version",
+        title: "app.version",
         value: "\(store.appVersion) (\(store.buildNumber))"
       )
 
       SettingsButtonRow(
         icon: "questionmark.circle.fill",
-        title: "Help & Support"
+        title: "settings.about.help"
       ) {
         store.send(.helpTapped)
       }
 
       SettingsButtonRow(
         icon: "doc.text.fill",
-        title: "Privacy Policy"
+        title: "settings.about.privacy_policy"
       ) {
         store.send(.privacyPolicyTapped)
       }
 
       SettingsButtonRow(
         icon: "doc.plaintext.fill",
-        title: "Terms of Service"
+        title: "settings.about.terms"
       ) {
         store.send(.termsOfServiceTapped)
       }
@@ -438,7 +438,7 @@ struct SettingsView: View {
       HStack(spacing: .spacingS) {
         Image(systemName: "heart.fill")
           .font(.labelLarge)
-        Text("Support Development")
+        Text("settings.support")
           .font(.labelLarge)
           .fontWeight(.medium)
       }
@@ -455,7 +455,7 @@ struct SettingsView: View {
 
 // MARK: - Settings Section
 struct SettingsSection<Content: View>: View {
-  let title: String
+  let title: LocalizedStringKey
   @ViewBuilder let content: () -> Content
 
   var body: some View {
@@ -481,8 +481,8 @@ struct SettingsSection<Content: View>: View {
 // MARK: - Settings Info Row
 struct SettingsInfoRow: View {
   let icon: String
-  let title: String
-  var subtitle: String?
+  let title: LocalizedStringKey
+  var subtitle: LocalizedStringKey?
   var value: String?
 
   var body: some View {
@@ -521,8 +521,8 @@ struct SettingsInfoRow: View {
 // MARK: - Settings Row
 struct SettingsRow<Destination: View>: View {
   let icon: String
-  let title: String
-  var subtitle: String?
+  let title: LocalizedStringKey
+  var subtitle: LocalizedStringKey?
   var value: String?
   @ViewBuilder var destination: () -> Destination
 
@@ -570,8 +570,8 @@ struct SettingsRow<Destination: View>: View {
 // MARK: - Settings Toggle Row
 struct SettingsToggleRow: View {
   let icon: String
-  let title: String
-  var subtitle: String?
+  let title: LocalizedStringKey
+  var subtitle: LocalizedStringKey?
   @Binding var isOn: Bool
 
   var body: some View {
@@ -608,7 +608,7 @@ struct SettingsToggleRow: View {
 // MARK: - Settings Button Row
 struct SettingsButtonRow: View {
   let icon: String
-  let title: String
+  let title: LocalizedStringKey
   var style: ButtonStyle = .normal
   var isLoading: Bool = false
   let action: () -> Void
@@ -652,7 +652,7 @@ struct SettingsButtonRow: View {
 // MARK: - Storage Info Row
 struct StorageInfoRow: View {
   let icon: String
-  let title: String
+  let title: LocalizedStringKey
   let size: Int64
 
   var body: some View {

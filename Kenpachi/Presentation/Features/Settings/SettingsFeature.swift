@@ -392,16 +392,16 @@ struct SettingsFeature {
 
       case .clearCacheTapped:
         state.alert = AlertState {
-          TextState("Clear Cache")
+          TextState(LocalizedStringKey("settings.cache.clear_alert_title"))
         } actions: {
           ButtonState(role: .destructive, action: .confirmClearCache) {
-            TextState("Clear")
+            TextState(LocalizedStringKey("settings.cache.clear_confirm"))
           }
           ButtonState(role: .cancel) {
-            TextState("Cancel")
+            TextState(LocalizedStringKey("settings.cache.clear_cancel"))
           }
         } message: {
-          TextState("This will clear all cached content. Downloaded content will not be affected.")
+          TextState(LocalizedStringKey("settings.cache.clear_alert_message"))
         }
         return .none
 
@@ -425,16 +425,16 @@ struct SettingsFeature {
 
       case .clearImageCacheTapped:
         state.alert = AlertState {
-          TextState("Clear Image Cache")
+          TextState(LocalizedStringKey("settings.image_cache.clear_alert_title"))
         } actions: {
           ButtonState(role: .destructive, action: .confirmClearImageCache) {
-            TextState("Clear")
+            TextState(LocalizedStringKey("settings.image_cache.clear_confirm"))
           }
           ButtonState(role: .cancel) {
-            TextState("Cancel")
+            TextState(LocalizedStringKey("settings.image_cache.clear_cancel"))
           }
         } message: {
-          TextState("This will clear all cached images. They will be re-downloaded when needed.")
+          TextState(LocalizedStringKey("settings.image_cache.clear_alert_message"))
         }
         return .none
 
@@ -458,16 +458,16 @@ struct SettingsFeature {
 
       case .clearUserDataTapped:
         state.alert = AlertState {
-          TextState("Clear User Data")
+          TextState(LocalizedStringKey("settings.storage.clear_user_data"))
         } actions: {
           ButtonState(role: .destructive, action: .confirmClearUserData) {
-            TextState("Clear")
+            TextState(LocalizedStringKey("common.clear"))
           }
           ButtonState(role: .cancel) {
-            TextState("Cancel")
+            TextState(LocalizedStringKey("common.cancel"))
           }
         } message: {
-          TextState("This will remove your profile, watchlist, watch history, and search history.")
+          TextState(LocalizedStringKey("settings.storage.clear_user_data_description"))
         }
         return .none
 
@@ -502,16 +502,16 @@ struct SettingsFeature {
 
       case .supportTapped:
         state.alert = AlertState {
-          TextState("Support Development")
+          TextState(LocalizedStringKey("settings.support_alert_title"))
         } actions: {
           ButtonState(role: .none, action: .confirmSupport) {
-            TextState("Open GitHub Sponsors")
+            TextState(LocalizedStringKey("settings.support.open_sponsors"))
           }
           ButtonState(role: .cancel) {
-            TextState("Cancel")
+            TextState(LocalizedStringKey("settings.support_cancel"))
           }
         } message: {
-          TextState("Support the development of Kenpachi by becoming a sponsor on GitHub.")
+          TextState(LocalizedStringKey("settings.support_alert_message"))
         }
         return .none
 

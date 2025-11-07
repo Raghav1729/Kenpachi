@@ -43,7 +43,7 @@ struct OfflinePlayerView: View {
             HStack(spacing: 8) {
               Image(systemName: "chevron.left")
                 .font(.title3)
-              Text("Back")
+              Text("common.back")
                 .font(.headline)
             }
             .foregroundColor(.white)
@@ -145,7 +145,7 @@ struct OfflinePlayerView: View {
         .scaleEffect(1.5)
         .tint(.white)
       
-      Text("Loading video...")
+      Text("player.loading")
         .font(.headline)
         .foregroundColor(.white)
     }
@@ -158,7 +158,7 @@ struct OfflinePlayerView: View {
         .font(.system(size: 50))
         .foregroundColor(.red)
       
-      Text("Playback Error")
+      Text("player.error.playback")
         .font(.title2)
         .fontWeight(.semibold)
         .foregroundColor(.white)
@@ -169,7 +169,7 @@ struct OfflinePlayerView: View {
         .multilineTextAlignment(.center)
         .padding(.horizontal, 40)
       
-      Button("Dismiss") {
+      Button("common.dismiss") {
         onDismiss()
       }
       .foregroundColor(.white)

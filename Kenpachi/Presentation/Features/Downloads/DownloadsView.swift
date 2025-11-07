@@ -5,48 +5,16 @@
 import ComposableArchitecture
 import SwiftUI
 
-/// Downloads tab options
-enum DownloadsTab: CaseIterable {
-  case downloads
-  case offline
-  
-  var title: String {
-    switch self {
-    case .downloads: return "Downloads"
-    case .offline: return "Offline Library"
-    }
-  }
-  
-  var icon: String {
-    switch self {
-    case .downloads: return "arrow.down.circle"
-    case .offline: return "folder"
-    }
-  }
-}
-
 struct DownloadsView: View {
   let store: StoreOf<DownloadsFeature>
-  
-  @State private var selectedTab: DownloadsTab = .downloads
 
   var body: some View {
     WithViewStore(store, observe: { $0 }) { viewStore in
       NavigationStack {
         VStack(spacing: 0) {
-          // Tab selector
-          tabSelector(viewStore: viewStore)
-          
-          // Content based on selected tab
           ZStack {
             Color.appBackground.ignoresSafeArea()
-            
-            switch selectedTab {
-            case .downloads:
-              downloadsContent(viewStore: viewStore)
-            case .offline:
-              offlineLibraryContent(viewStore: viewStore)
-            }
+            downloadsContent(viewStore: viewStore)
           }
         }
         .navigationTitle("downloads.title")
@@ -54,16 +22,6 @@ struct DownloadsView: View {
         .toolbar {
           ToolbarItem(placement: .navigationBarTrailing) {
             HStack(spacing: 16) {
-              // Quick switch to offline library if there are completed downloads
-              if viewStore.downloads.contains(where: { $0.state == .completed }) && selectedTab == .downloads {
-                Button {
-                  selectedTab = .offline
-                } label: {
-                  Image(systemName: "folder")
-                    .foregroundColor(.primaryBlue)
-                }
-              }
-              
               Button {
                 viewStore.send(.storageInfoTapped)
               } label: {
@@ -89,7 +47,7 @@ struct DownloadsView: View {
           Button("common.cancel", role: .cancel) {
             viewStore.send(.cancelDelete)
           }
-          Button("downloads.delete.confirm", role: .destructive) {
+          Button("downloads.action.delete", role: .destructive) {
             viewStore.send(.confirmDelete)
           }
         } message: {
@@ -121,34 +79,6 @@ struct DownloadsView: View {
         }
       }
     }
-  }
-  
-  /// Tab selector
-  private func tabSelector(viewStore: ViewStoreOf<DownloadsFeature>) -> some View {
-    HStack(spacing: 0) {
-      ForEach(DownloadsTab.allCases, id: \.self) { tab in
-        Button(action: { selectedTab = tab }) {
-          VStack(spacing: 4) {
-            Image(systemName: tab.icon)
-              .font(.system(size: 16, weight: .medium))
-            
-            Text(tab.title)
-              .font(.caption)
-              .fontWeight(.medium)
-          }
-          .foregroundColor(selectedTab == tab ? .primaryBlue : .textSecondary)
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 12)
-        }
-      }
-    }
-    .background(Color.cardBackground)
-    .overlay(
-      Rectangle()
-        .frame(height: 0.5)
-        .foregroundColor(.textTertiary.opacity(0.3)),
-      alignment: .bottom
-    )
   }
   
   /// Downloads content (current view)
@@ -197,23 +127,6 @@ struct DownloadsView: View {
         }
       }
     }
-  }
-  
-  /// Offline library content
-  private func offlineLibraryContent(viewStore: ViewStoreOf<DownloadsFeature>) -> some View {
-    OfflineLibraryView(
-      downloads: viewStore.downloads,
-      onContentTapped: { download in
-        viewStore.send(.showOfflinePlayer(download))
-      },
-      onContentDeleted: { download in
-        viewStore.send(.deleteDownloadTapped(download))
-      },
-      onContentConverted: { download in
-        viewStore.send(.convertToMP4(download))
-      },
-      conversionProgress: viewStore.convertingDownloads
-    )
   }
 }
 
@@ -385,7 +298,7 @@ struct DownloadCard: View {
                     .progressViewStyle(CircularProgressViewStyle(tint: .orange))
                     .scaleEffect(1.2)
                   
-                  Text("Converting")
+                  Text("downloads.status.converting")
                     .font(.captionSmall)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
@@ -487,7 +400,7 @@ struct DownloadCard: View {
           
           // Show HLS indicator
           if isHLSPackage {
-            Text("HLS")
+            Text("downloads.tag.hls")
               .font(.captionSmall)
               .fontWeight(.medium)
               .foregroundColor(.orange)
@@ -522,7 +435,7 @@ struct DownloadCard: View {
         }
         
         if isHLSPackage {
-          Button("Convert to MP4") {
+          Button("downloads.action.convert_mp4") {
             onConvert()
           }
         }

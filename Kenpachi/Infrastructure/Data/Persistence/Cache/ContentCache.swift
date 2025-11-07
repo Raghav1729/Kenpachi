@@ -179,7 +179,7 @@ final class ContentCache {
     }
 
     // Cache in memory with shorter expiration (15 minutes)
-    cacheManager.cacheInMemory(data: data, forKey: key, expirationTime: 900)
+    cacheManager.cacheInMemory(data: data, forKey: key, expirationTime: 1800)
 
     // Also cache to disk
     cacheManager.cacheToDisk(data: data, forKey: key)
@@ -209,7 +209,7 @@ final class ContentCache {
       let results = try? JSONDecoder().decode(ContentSearchResult.self, from: data)
     {
       // Re-cache in memory for faster access
-      cacheManager.cacheInMemory(data: data, forKey: key, expirationTime: 900)
+      cacheManager.cacheInMemory(data: data, forKey: key, expirationTime: 1800)
       return results
     }
 
