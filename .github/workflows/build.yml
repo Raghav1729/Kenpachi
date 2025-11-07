@@ -13,7 +13,7 @@ jobs:
       - name: Select latest Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: 16.0.1
+          xcode-version: 26.0.1
 
       - name: Show selected toolchain
         run: |
