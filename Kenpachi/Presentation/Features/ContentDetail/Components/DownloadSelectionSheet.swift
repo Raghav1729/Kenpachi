@@ -88,9 +88,11 @@ struct DownloadSelectionSheet: View {
       do {
         let contentRepository = ContentRepository()
         // Get episode ID for stream extraction
+        let seasonId = selectedSeason?.id
         let episodeId = selectedEpisode?.id
         let links = try await contentRepository.extractStreamingLinks(
           contentId: content.id,
+          seasonId: seasonId,
           episodeId: episodeId
         )
 

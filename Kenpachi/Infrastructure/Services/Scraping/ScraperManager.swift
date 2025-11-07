@@ -43,8 +43,10 @@ final class ScraperManager {
   private func registerDefaultScrapers() {
     // Movie/TV scrapers - FlixHQ is primary/default
     registerScraper(FlixHQ())
-    // MP4Hydra host-only scraper (extraction focused)
-    registerScraper(MP4Hydra())
+    // VidEasy host-only scraper (Videasy backend)
+    registerScraper(VidEasy())
+    // VidLink provider
+    registerScraper(VidLink())
 
     // Log registered scrapers
     AppLogger.shared.log(

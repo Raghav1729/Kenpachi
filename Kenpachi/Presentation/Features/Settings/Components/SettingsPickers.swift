@@ -146,15 +146,9 @@ struct ScraperSourcePicker: View {
               .foregroundColor(.primaryBlue)
               .frame(width: 28)
 
-            VStack(alignment: .leading, spacing: .spacingXS) {
-              Text(source.displayName)
-                .font(.bodyMedium)
-                .foregroundColor(.textPrimary)
-
-              Text(descriptionForSource(source))
-                .font(.captionLarge)
-                .foregroundColor(.textSecondary)
-            }
+            Text(source.displayName)
+              .font(.bodyMedium)
+              .foregroundColor(.textPrimary)
 
             Spacer()
 
@@ -172,12 +166,6 @@ struct ScraperSourcePicker: View {
     .navigationBarTitleDisplayMode(.inline)
   }
 
-  private func descriptionForSource(_ source: ScraperSource) -> String {
-    switch source {
-    case .FlixHQ: return "High quality streams, reliable"
-    case .MP4Hydra: return "Host-only provider (link extraction)"
-    }
-  }
 }
 
 // MARK: - Language Picker

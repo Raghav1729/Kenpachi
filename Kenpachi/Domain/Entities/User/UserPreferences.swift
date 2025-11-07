@@ -57,12 +57,14 @@ enum AutoLockTimeout: Int, Equatable, Codable, CaseIterable {
 /// Scraper source options
 enum ScraperSource: String, Equatable, CaseIterable {
   case FlixHQ
-  case MP4Hydra
+  case VidEasy
+  case VidLink
   
   var displayName: String {
     switch self {
     case .FlixHQ: return "FlixHQ"
-    case .MP4Hydra: return "MP4Hydra"
+    case .VidEasy: return "VidEasy"
+    case .VidLink: return "VidLink"
     }
   }
 }
@@ -76,7 +78,8 @@ extension ScraperSource: Codable {
     // Handle both case name and raw value
     switch rawValue {
     case "FlixHQ": self = .FlixHQ
-    case "MP4Hydra": self = .MP4Hydra
+    case "VidEasy": self = .VidEasy
+    case "VidLink": self = .VidLink
     default:
       throw DecodingError.dataCorruptedError(
         in: container,
