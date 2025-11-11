@@ -202,18 +202,20 @@ struct HomeFeature {
 
             // If the content is a TV show, get the first episode of the first season.
             var episodeId: String?
+            var seasonId: String?
             if content.type == .tvShow,
               let firstSeason = content.seasons?.first,
               let firstEpisode = firstSeason.episodes?.first
             {
               episodeId = firstEpisode.id
+              seasonId = firstSeason.id
             }
 
             // Extract the streaming links from the repository.
             let links = try await contentRepository.extractStreamingLinks(
               contentId: content.id,
-              seasonId: content.seasons?.first?.id,
-              episodeId: episodeId
+              seasonId:  content.type == .tvShow ? seasonId ?? "1" : nil,
+              episodeId:  content.type == .tvShow ? episodeId ?? "1" : nil
             )
 
             // If no links are found, dispatch the `linkExtractionFailed` action.

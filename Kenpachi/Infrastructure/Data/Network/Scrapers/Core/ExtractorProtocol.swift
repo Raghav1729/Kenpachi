@@ -36,7 +36,8 @@ final class ExtractorResolver {
             DoodStreamExtractor(),
             StreamTapeExtractor(),
             VidCloudExtractor(),
-            MixDropExtractor()
+            MixDropExtractor(),
+            MegaUpExtractor()
         ]
     }
     

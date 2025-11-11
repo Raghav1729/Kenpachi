@@ -47,6 +47,10 @@ final class ScraperManager {
     registerScraper(VidEasy())
     // VidLink provider
     registerScraper(VidLink())
+    // VidSrc provider
+    registerScraper(VidSrc())
+    // Anime provider
+    registerScraper(AnimeKai())
 
     // Log registered scrapers
     AppLogger.shared.log(

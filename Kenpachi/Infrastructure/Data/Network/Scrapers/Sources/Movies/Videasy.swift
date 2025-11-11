@@ -93,15 +93,7 @@ struct VidEasy: ScraperProtocol {
       .init(name: "Omen", url: "https://api.videasy.net/onionplay/sources-with-title", language: "Original", moviesOnly: false, params: nil),
       .init(name: "Breach", url: "https://api.videasy.net/m4uhd/sources-with-title", language: "Original", moviesOnly: false, params: nil),
       .init(name: "Vyse", url: "https://api.videasy.net/hdmovie/sources-with-title", language: "Original", moviesOnly: false, params: nil),
-      .init(name: "Killjoy", url: "https://api.videasy.net/meine/sources-with-title", language: "German", moviesOnly: false, params: ["language": "german"]),
-      .init(name: "Harbor", url: "https://api.videasy.net/meine/sources-with-title", language: "Italian", moviesOnly: false, params: ["language": "italian"]),
-      .init(name: "Chamber", url: "https://api.videasy.net/meine/sources-with-title", language: "French", moviesOnly: true, params: ["language": "french"]),
-      .init(name: "Fade", url: "https://api.videasy.net/hdmovie/sources-with-title", language: "Hindi", moviesOnly: false, params: nil),
-      .init(name: "Gekko", url: "https://api2.videasy.net/cuevana-latino/sources-with-title", language: "Latin", moviesOnly: false, params: nil),
-      .init(name: "Kayo", url: "https://api2.videasy.net/cuevana-spanish/sources-with-title", language: "Spanish", moviesOnly: false, params: nil),
-      .init(name: "Raze", url: "https://api.videasy.net/superflix/sources-with-title", language: "Portuguese", moviesOnly: false, params: nil),
-      .init(name: "Phoenix", url: "https://api2.videasy.net/overflix/sources-with-title", language: "Portuguese", moviesOnly: false, params: nil),
-      .init(name: "Astra", url: "https://api.videasy.net/visioncine/sources-with-title", language: "Portuguese", moviesOnly: false, params: nil)
+      .init(name: "Fade", url: "https://api.videasy.net/hdmovie/sources-with-title", language: "Hindi", moviesOnly: false, params: nil)
     ]
 
     // Helper: build endpoint for server GET (returns encrypted text)

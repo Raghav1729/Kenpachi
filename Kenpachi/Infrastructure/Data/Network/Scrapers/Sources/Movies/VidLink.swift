@@ -1,3 +1,6 @@
+// VidLink.swift
+// VidLink scraper implementation
+
 import Foundation
 
 struct VidLink: ScraperProtocol {
@@ -26,12 +29,16 @@ struct VidLink: ScraperProtocol {
       .sorted { ($0.voteAverage ?? 0) > ($1.voteAverage ?? 0) }
       .prefix(10)
     carousels.append(ContentCarousel(title: "Featured", items: Array(heroItems), type: .hero))
-    carousels.append(ContentCarousel(title: "Trending Movies", items: trendingMovies, type: .trending))
-    carousels.append(ContentCarousel(title: "Trending TV Shows", items: trendingTV, type: .trending))
+    carousels.append(
+      ContentCarousel(title: "Trending Movies", items: trendingMovies, type: .trending))
+    carousels.append(
+      ContentCarousel(title: "Trending TV Shows", items: trendingTV, type: .trending))
     carousels.append(ContentCarousel(title: "Popular Movies", items: popularMovies, type: .popular))
     carousels.append(ContentCarousel(title: "Popular TV Shows", items: popularTV, type: .popular))
-    carousels.append(ContentCarousel(title: "Top Rated Movies", items: topRatedMovies, type: .topRated))
-    carousels.append(ContentCarousel(title: "Top Rated TV Shows", items: topRatedTV, type: .topRated))
+    carousels.append(
+      ContentCarousel(title: "Top Rated Movies", items: topRatedMovies, type: .topRated))
+    carousels.append(
+      ContentCarousel(title: "Top Rated TV Shows", items: topRatedTV, type: .topRated))
     return carousels
   }
 
@@ -66,11 +73,12 @@ struct VidLink: ScraperProtocol {
     return try await tmdb.fetchTVShowDetails(id: id)
   }
 
-  func extractStreamingLinks(contentId: String, seasonId: String?, episodeId: String?) async throws -> [ExtractedLink] {
-    let details = try await fetchContentDetails(id: contentId, type: nil)
-    let mediaType: String = (seasonId != nil && episodeId != nil) || details.type == .tvShow ? "tv" : "movie"
-    let title = details.title
-    let year = details.releaseYear ?? ""
+  func extractStreamingLinks(contentId: String, seasonId: String?, episodeId: String?) async throws
+    -> [ExtractedLink]
+  {
+      let details = try await fetchContentDetails(id: contentId, type: (seasonId != nil && episodeId != nil) ? .tvShow : .movie)
+    let mediaType: String =
+      (seasonId != nil && episodeId != nil) || details.type == .tvShow ? "tv" : "movie"
 
     let encId = try await encryptTmdbId(contentId)
 
@@ -85,13 +93,6 @@ struct VidLink: ScraperProtocol {
 
     guard let json = try? JSONSerialization.jsonObject(with: data, options: []) else { return [] }
 
-    let mediaInfo: [String: Any] = [
-      "title": year.isEmpty ? title : "\(title) (\(year))",
-      "mediaType": mediaType,
-      "season": seasonId ?? "",
-      "episode": episodeId ?? ""
-    ]
-
     var links: [ExtractedLink] = []
 
     func push(url: String, quality: String) {
@@ -99,17 +100,19 @@ struct VidLink: ScraperProtocol {
       let headers: [String: String] = {
         if url.contains(".m3u8") {
           return [
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
             "Accept": "application/vnd.apple.mpegurl,application/x-mpegURL,*/*",
             "Referer": "https://vidlink.pro/",
-            "Origin": "https://vidlink.pro"
+            "Origin": "https://vidlink.pro",
           ]
         }
         return [
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
           "Accept": "application/json,*/*",
           "Referer": "https://vidlink.pro/",
-          "Origin": "https://vidlink.pro"
+          "Origin": "https://vidlink.pro",
         ]
       }()
       links.append(
@@ -130,7 +133,9 @@ struct VidLink: ScraperProtocol {
         if let stream = dict["stream"] as? [String: Any] {
           if let qualities = stream["qualities"] as? [String: Any] {
             for (qKey, qVal) in qualities {
-              if let qDict = qVal as? [String: Any], let u = qDict["url"] as? String { push(url: u, quality: mapQuality(qKey)) }
+              if let qDict = qVal as? [String: Any], let u = qDict["url"] as? String {
+                push(url: u, quality: mapQuality(qKey))
+              }
             }
           }
           if let playlist = stream["playlist"] as? String {
@@ -139,14 +144,20 @@ struct VidLink: ScraperProtocol {
         } else if let url = dict["url"] as? String {
           push(url: url, quality: mapQuality(nil))
         } else if let streams = dict["streams"] as? [[String: Any]] {
-          for s in streams { if let u = s["url"] as? String { push(url: u, quality: mapQuality(s["quality"])) } }
+          for s in streams {
+            if let u = s["url"] as? String { push(url: u, quality: mapQuality(s["quality"])) }
+          }
         } else if let linksArr = dict["links"] as? [[String: Any]] {
-          for s in linksArr { if let u = s["url"] as? String { push(url: u, quality: mapQuality(s["quality"])) } }
+          for s in linksArr {
+            if let u = s["url"] as? String { push(url: u, quality: mapQuality(s["quality"])) }
+          }
         } else {
           for (k, v) in dict {
-            if let str = v as? String, (str.hasPrefix("http") || str.contains(".m3u8")) {
+            if let str = v as? String, str.hasPrefix("http") || str.contains(".m3u8") {
               if str.contains(".srt") || str.contains(".vtt") { continue }
-              if k.lowercased().contains("subtitle") || k.lowercased().contains("caption") { continue }
+              if k.lowercased().contains("subtitle") || k.lowercased().contains("caption") {
+                continue
+              }
               push(url: str, quality: mapQuality(k))
             } else if let sub = v as? [String: Any] {
               processObject(sub)
@@ -177,15 +188,16 @@ private struct VidLinkAPIEndpoint: Endpoint {
   var baseURL: String { "https://vidlink.pro" }
   var path: String
   var method: HTTPMethod { .get }
-  var headers: [String : String]? {
+  var headers: [String: String]? {
     [
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
       "Accept": "application/json,*/*",
       "Accept-Language": "en-US,en;q=0.5",
       "Accept-Encoding": "gzip, deflate",
       "Connection": "keep-alive",
       "Referer": "https://vidlink.pro/",
-      "Origin": "https://vidlink.pro"
+      "Origin": "https://vidlink.pro",
     ]
   }
   var queryItems: [URLQueryItem]? { nil }
@@ -196,28 +208,30 @@ private struct VidLinkEncryptEndpoint: Endpoint {
   var baseURL: String { "https://enc-dec.app" }
   var path: String { "/api/enc-vidlink" }
   var method: HTTPMethod { .get }
-  var headers: [String : String]? {
+  var headers: [String: String]? {
     [
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
       "Accept": "application/json,*/*",
-      "Connection": "keep-alive"
+      "Connection": "keep-alive",
     ]
   }
-  var queryItems: [URLQueryItem]? { [ URLQueryItem(name: "text", value: text) ] }
+  var queryItems: [URLQueryItem]? { [URLQueryItem(name: "text", value: text)] }
   var body: Data? { nil }
   let text: String
 }
 
-private extension VidLink {
-  func encryptTmdbId(_ id: String) async throws -> String {
+extension VidLink {
+  fileprivate func encryptTmdbId(_ id: String) async throws -> String {
     let endpoint = VidLinkEncryptEndpoint(text: id)
     let data = try await networkClient.requestData(endpoint)
     guard let obj = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-          let result = obj["result"] as? String else { throw ScraperError.extractionFailed("Encryption failed") }
+      let result = obj["result"] as? String
+    else { throw ScraperError.extractionFailed("Encryption failed") }
     return result
   }
 
-  func mapQuality(_ any: Any?) -> String {
+  fileprivate func mapQuality(_ any: Any?) -> String {
     guard let any = any else { return "Unknown" }
     let s = String(describing: any).lowercased()
     if s.contains("2160") || s.contains("4k") { return "4K" }
@@ -242,7 +256,7 @@ private extension VidLink {
     return "Unknown"
   }
 
-  func qualityRank(_ q: String?) -> Int {
+  fileprivate func qualityRank(_ q: String?) -> Int {
     guard var v = q?.lowercased() else { return 0 }
     if v == "adaptive" || v == "auto" { return 4000 }
     if v == "4k" { return 2160 }

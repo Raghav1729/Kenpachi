@@ -59,12 +59,14 @@ enum ScraperSource: String, Equatable, CaseIterable {
   case FlixHQ
   case VidEasy
   case VidLink
+  case VidSrc
   
   var displayName: String {
     switch self {
     case .FlixHQ: return "FlixHQ"
     case .VidEasy: return "VidEasy"
     case .VidLink: return "VidLink"
+    case .VidSrc: return "VidSrc"
     }
   }
 }
@@ -80,6 +82,7 @@ extension ScraperSource: Codable {
     case "FlixHQ": self = .FlixHQ
     case "VidEasy": self = .VidEasy
     case "VidLink": self = .VidLink
+    case "VidSrc": self = .VidSrc
     default:
       throw DecodingError.dataCorruptedError(
         in: container,
